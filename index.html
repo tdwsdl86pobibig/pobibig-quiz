@@ -1186,16 +1186,6 @@ function renderLobbyPlayers(players){
     card.innerHTML = `<div class="text-2xl mb-1">${p.avatar}</div><div>${escapeHtml(p.nickname)}</div>`;
     grid.appendChild(card);
   });
-
-  // [버그 수정] 팀전 설정 패널(TeamSystem)은 window.teamPlayers를 통해 학생 명단을 받아
-  // "학생 팀 배정" 목록을 그리는데, 이 명단을 채워주는 TeamSystem.setPlayers(...) 호출이
-  // 코드 어디에도 없었습니다. 그래서 학생이 로비에 접속해도(메인 화면에는 잘 보였지만)
-  // 팀 배정 패널에는 영원히 "배정된 학생 없음"만 표시되고 있었습니다.
-  // 학생 명단이 갱신될 때마다(=매번 이 함수가 호출될 때마다) TeamSystem에도 최신 명단을
-  // 전달해서 팀 배정 목록이 실시간으로 함께 갱신되도록 연결합니다.
-  if(window.TeamSystem && typeof window.TeamSystem.setPlayers === 'function'){
-    window.TeamSystem.setPlayers(ids.map(pid => ({ ...players[pid], id: pid })));
-  }
 }
 
 function startCountdownAndStartGame() {
