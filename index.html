@@ -1,0 +1,2187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>QuizRush - 실시간 멀티플레이 퀴즈 플랫폼</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+
+<style>
+  :root{
+    --pastel-pink:#FF8FB1;
+    --pastel-blue:#6FC3E8;
+    --pastel-purple:#B39CF0;
+    --pastel-yellow:#FFC96B;
+    --pastel-mint:#7FD9B9;
+    --bg-cream:#FFF6EC;
+    --ink:#5B4B6A;
+  }
+  *{ -webkit-tap-highlight-color: transparent; }
+  html,body{
+    height:100%;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(255,201,224,0.55), transparent 45%),
+      radial-gradient(circle at 88% 12%, rgba(178,224,255,0.55), transparent 45%),
+      radial-gradient(circle at 20% 95%, rgba(200,246,220,0.55), transparent 50%),
+      radial-gradient(circle at 85% 90%, rgba(255,224,168,0.55), transparent 50%),
+      var(--bg-cream);
+    font-family:'Rubik', 'Pretendard', sans-serif;
+    color: var(--ink);
+    overflow-x:hidden;
+  }
+  .font-display{ font-family:'Baloo 2', sans-serif; }
+
+  .neon-text{
+    background: linear-gradient(90deg, #FF6FA0, #7FC7F2, #B39CF0, #FF6FA0);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    background-size: 250% auto;
+    animation: shine 6s linear infinite;
+  }
+  @keyframes shine{ to{ background-position: -250% center; } }
+
+  section {
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+  }
+  section.hidden {
+    display: none !important;
+    opacity: 0;
+  }
+
+  .glass{
+    background: rgba(255,255,255,0.78);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.9);
+    box-shadow: 0 10px 28px rgba(190,160,210,0.22);
+  }
+
+  button, .glow-btn, .shape-btn {
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+    will-change: transform;
+  }
+  .glow-btn{
+    box-shadow: 0 8px 0 rgba(0,0,0,0.06), 0 10px 24px rgba(255,143,177,0.45);
+  }
+  .glow-btn:hover { transform: translateY(-2px); }
+  button:active, .glow-btn:active, .shape-btn:active {
+    transform: scale(0.95) translateY(2px) !important;
+  }
+
+  /* 텍스트 컬러 가독성 보장 지정 */
+  .text-ink { color: var(--ink) !important; }
+  .text-white\/70{ color: rgba(91,75,106,0.75) !important; }
+  .text-white\/60{ color: rgba(91,75,106,0.65) !important; }
+  .text-white\/50{ color: rgba(91,75,106,0.55) !important; }
+  .text-white\/40{ color: rgba(91,75,106,0.45) !important; }
+
+  /* [수정 반영] 결과 및 최종 화면 '처음으로' 버튼 명시적 스타일 */
+  .btn-reset {
+    background-color: #ffffff !important;
+    color: var(--ink) !important;
+    border: 2px solid rgba(200,180,220,0.6) !important;
+    box-shadow: 0 4px 12px rgba(91,75,106,0.12) !important;
+    font-weight: 800 !important;
+  }
+  .btn-reset:hover {
+    background-color: #fcf8ff !important;
+    transform: translateY(-2px);
+  }
+
+  @keyframes pop-bounce{
+    0%{ transform: scale(0) rotate(-8deg); opacity:0; }
+    55%{ transform: scale(1.15) rotate(4deg); opacity:1; }
+    75%{ transform: scale(0.92) rotate(-2deg); }
+    100%{ transform: scale(1) rotate(0deg); }
+  }
+  .player-card{ animation: pop-bounce .4s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes idle-bob{
+    0%,100%{ transform: translateY(0); }
+    50%{ transform: translateY(-6px); }
+  }
+  .idle-bob{ animation: idle-bob 2.4s ease-in-out infinite; }
+
+  .shape-btn{
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:1.1rem;
+    border-radius: 1.2rem;
+    color:#fff;
+    user-select:none;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+  }
+  
+  .shape-red{ background: #E53935; }
+  .shape-orange{ background: #FB8C00; }
+  .shape-green{ background: #43A047; }
+  .shape-blue{ background: #1E88E5; }
+
+  .shape-o{ background: #00A0E9; }
+  .shape-x{ background: #E60012; }
+
+  .bar-fill{ transition: width 0.8s cubic-bezier(.22,1,.36,1); border-radius: 9999px; }
+  .podium-bar{ transition: height 1.2s cubic-bezier(.22,1,.36,1) .3s; border-radius: 1.5rem 1.5rem 0.5rem 0.5rem; }
+
+  .media-container {
+    contain: layout paint;
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+  video, iframe {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    border-radius: 1rem;
+  }
+
+  #countdown-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  #countdown-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #countdown-text {
+    font-size: 80px;
+    font-weight: 900;
+    color: var(--pastel-pink);
+    text-shadow: 0 0 25px rgba(255, 143, 177, 0.6);
+  }
+
+  ::-webkit-scrollbar{ width:6px; }
+  ::-webkit-scrollbar-thumb{ background: rgba(180,150,200,0.35); border-radius:4px; }
+  .pin-digit{ font-family:'Baloo 2', sans-serif; letter-spacing:.15em; }
+
+  input, select, textarea{ background: rgba(255,255,255,0.9); border: 2px solid rgba(200,180,220,0.5); color:#3f3350; }
+  input::placeholder, textarea::placeholder{ color:#b3a4c2; }
+</style>
+</head>
+<body class="min-h-screen w-full">
+
+<div id="countdown-overlay">
+  <div id="countdown-text">3</div>
+</div>
+
+<div id="voter-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="glass w-full max-w-sm rounded-[2rem] p-6 flex flex-col max-h-[80vh]">
+    <div class="flex items-center justify-between mb-4">
+      <h3 id="modal-choice-title" class="font-bold text-lg flex items-center gap-2"></h3>
+      <button onclick="closeVoterModal()" class="text-white/50 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="modal-voter-list" class="flex flex-col gap-2 overflow-y-auto pr-1 flex-1"></div>
+  </div>
+</div>
+
+<div id="app" class="min-h-screen w-full flex flex-col items-center">
+
+  <section id="screen-landing" class="w-full min-h-screen flex flex-col items-center justify-center px-6 text-center">
+    <h1 class="font-display text-5xl md:text-6xl font-extrabold neon-text mb-2">QuizRush</h1>
+    <p class="text-white/60 mb-10">실시간 멀티플레이 퀴즈 배틀 플랫폼</p>
+
+    <div class="w-full max-w-sm flex flex-col gap-4">
+      <button onclick="playClick();openTeacherEntry()" class="glass glow-btn rounded-[1.9rem] py-5 font-bold text-lg flex items-center justify-center gap-3">
+        <i class="fa-solid fa-chalkboard-user text-2xl text-[var(--pastel-blue)]"></i> 선생님으로 시작하기
+      </button>
+      <button onclick="playClick();goTo('screen-student-join')" class="glass glow-btn rounded-[1.9rem] py-5 font-bold text-lg flex items-center justify-center gap-3">
+        <i class="fa-solid fa-mobile-screen-button text-2xl text-[var(--pastel-pink)]"></i> 학생으로 참여하기
+      </button>
+    </div>
+  </section>
+
+  <section id="screen-teacher-auth" class="hidden w-full min-h-screen px-6 py-8 flex flex-col items-center justify-center">
+    <div class="w-full max-w-sm">
+      <div class="text-center mb-7">
+        <div class="text-5xl mb-3">👩‍🏫</div>
+        <h2 id="teacher-auth-title" class="font-display text-3xl font-extrabold neon-text">선생님 로그인</h2>
+        <p class="text-white/55 text-sm mt-2 font-bold">학생은 회원가입 없이 바로 참여할 수 있습니다.</p>
+      </div>
+      <div class="glass rounded-[1.9rem] p-5">
+        <div id="teacher-name-wrap" class="hidden mb-3">
+          <label class="text-xs font-bold text-gray-700 mb-1 block">선생님 닉네임</label>
+          <input id="teacher-name-input" type="text" maxlength="30" placeholder="사이트에 표시할 닉네임"
+                 class="w-full rounded-2xl px-3 py-3 outline-none font-bold text-gray-900 bg-white/90 placeholder:text-gray-400 border border-gray-200">
+        </div>
+        <label class="text-xs font-bold text-white/70 mb-1 block">이메일</label>
+        <input id="teacher-email-input" type="email" autocomplete="email" placeholder="teacher@example.com"
+               class="w-full rounded-2xl px-3 py-3 outline-none font-bold mb-3 text-gray-900 bg-white/90 placeholder:text-gray-400 border border-gray-200">
+        <label class="text-xs font-bold text-white/70 mb-1 block">비밀번호</label>
+        <div class="relative mb-3">
+          <input id="teacher-password-input" type="password" autocomplete="current-password" placeholder="6자 이상"
+                 class="w-full rounded-2xl px-3 py-3 pr-12 outline-none font-bold text-gray-900 bg-white/90 placeholder:text-gray-400 border border-gray-200">
+          <button type="button" onclick="togglePasswordVisibility('teacher-password-input', this)"
+                  aria-label="비밀번호 표시/숨기기"
+                  class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl text-gray-500 hover:text-gray-800">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+        </div>
+
+        <div id="teacher-password-confirm-wrap" class="hidden mb-4">
+          <label class="text-xs font-bold text-white/70 mb-1 block">비밀번호 재확인</label>
+          <div class="relative">
+            <input id="teacher-password-confirm-input" type="password" autocomplete="new-password" placeholder="비밀번호를 한 번 더 입력해주세요"
+                   class="w-full rounded-2xl px-3 py-3 pr-12 outline-none font-bold text-gray-900 bg-white/90 placeholder:text-gray-400 border border-gray-200">
+            <button type="button" onclick="togglePasswordVisibility('teacher-password-confirm-input', this)"
+                    aria-label="비밀번호 재확인 표시/숨기기"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl text-gray-500 hover:text-gray-800">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+          <p id="teacher-password-match" class="text-xs font-bold mt-2 hidden"></p>
+        </div>
+        <button id="teacher-auth-submit" onclick="submitTeacherAuth()"
+                class="glow-btn w-full bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-2xl py-3.5 font-bold text-lg">
+          로그인
+        </button>
+        <p id="teacher-auth-error" class="hidden text-rose-500 text-sm font-bold text-center mt-3"></p>
+        <button id="teacher-auth-toggle" onclick="toggleTeacherAuthMode()"
+                class="w-full text-sm font-bold text-indigo-600 mt-4">
+          처음이신가요? 회원가입
+        </button>
+        <button onclick="goTo('screen-landing')" class="w-full text-white/45 text-sm mt-5">
+          <i class="fa-solid fa-arrow-left mr-1"></i> 뒤로가기
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-host-home" class="hidden w-full min-h-screen px-4 py-8 max-w-3xl mx-auto">
+    <div class="flex items-center justify-between mb-6 pt-6">
+      <h2 class="font-display text-2xl font-bold">퀴즈 관리 (선생님)</h2>
+      <div class="flex items-center gap-3">
+        <button id="teacher-account-label" class="text-xs font-bold text-white/55 max-w-[170px] truncate"></button>
+        <button onclick="teacherLogout()" class="text-rose-500 font-bold text-sm"><i class="fa-solid fa-right-from-bracket mr-1"></i>로그아웃</button>
+        <button onclick="goTo('screen-landing')" class="text-white/50 hover:text-white"><i class="fa-solid fa-arrow-left"></i> 뒤로</button>
+      </div>
+    </div>
+
+    <div class="glass rounded-[1.9rem] p-5 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 id="form-header-title" class="font-bold flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-[var(--pastel-blue)]"></i> 새 문제 추가
+        </h3>
+        <span id="editing-badge" class="hidden bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-300">
+          ✏️ 퀴즈 수정 모드
+        </span>
+      </div>
+      
+      <input id="quiz-title-input" type="text" placeholder="퀴즈 세트 제목 (예: 과학 2단원 평가)" class="w-full rounded-2xl px-3 py-2 mb-3 outline-none font-bold">
+
+      <div class="mb-3">
+        <label class="text-xs font-bold text-white/70 mb-1 block">문제 유형</label>
+        <select id="q-type-select" onchange="handleQuestionTypeChange()" class="w-full rounded-2xl px-3 py-2 outline-none font-bold text-sm">
+          <option value="choice">짧은 글 선택형 (위2 아래2 기본)</option>
+          <option value="long_passage">긴 글 전용 문제 (지문 + 선택형)</option>
+          <option value="ox">OX 문제 (참/거짓)</option>
+          <option value="subjective">서술형 / 정답 있는 주관식</option>
+          <option value="opinion">생각·토론형 / 정답 없음</option>
+        </select>
+      </div>
+
+      <div id="q-passage-wrap" class="hidden mb-3">
+        <textarea id="q-passage-input" rows="4" placeholder="지문 내용(긴 글)을 여기에 입력하세요..." class="w-full rounded-2xl p-3 text-sm outline-none"></textarea>
+      </div>
+
+      <textarea id="q-text-input" rows="2" placeholder="문제 질문을 입력하세요..." class="w-full rounded-2xl p-3 mb-3 text-sm outline-none"></textarea>
+
+      <div class="mb-3">
+        <label class="text-xs font-bold text-white/70 mb-1 block"><i class="fa-solid fa-lightbulb text-[var(--pastel-yellow)] mr-1"></i> 문제 해설 (정답 공개 화면에 표시)</label>
+        <textarea id="q-explanation-input" rows="3" placeholder="정답의 이유, 풀이 과정, 참고 내용을 입력하세요... (선택사항)" class="w-full rounded-2xl p-3 text-sm outline-none"></textarea>
+      </div>
+
+      <div id="q-choices-container" class="mb-3">
+        <div id="q-choices-4" class="grid grid-cols-1 gap-2">
+          <input id="q-choice-0" type="text" placeholder="① 번 보기 (빨강 - Triangle)" class="rounded-2xl px-3 py-2 outline-none border-l-8 border-red-500">
+          <input id="q-choice-1" type="text" placeholder="② 번 보기 (주황 - Diamond)" class="rounded-2xl px-3 py-2 outline-none border-l-8 border-orange-500">
+          <input id="q-choice-2" type="text" placeholder="③ 번 보기 (초록 - Circle)" class="rounded-2xl px-3 py-2 outline-none border-l-8 border-green-500">
+          <input id="q-choice-3" type="text" placeholder="④ 번 보기 (파랑 - Square)" class="rounded-2xl px-3 py-2 outline-none border-l-8 border-blue-500">
+        </div>
+      </div>
+
+      <div class="flex gap-2 mb-3 items-center flex-wrap glass p-3 rounded-2xl">
+        <div id="correct-select-wrap" class="flex items-center gap-2">
+          <label class="text-sm font-bold text-white/70">정답:</label>
+          <select id="q-correct-select" class="rounded-2xl px-2 py-1 font-bold text-sm">
+            <option value="0">① 번 (빨강)</option>
+            <option value="1">② 번 (주황)</option>
+            <option value="2">③ 번 (초록)</option>
+            <option value="3">④ 번 (파랑)</option>
+          </select>
+        </div>
+
+        <div id="correct-subjective-wrap" class="hidden flex-1 flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <label id="subjective-answer-label" class="text-sm font-bold text-white/70 shrink-0">정답/유사답안:</label>
+            <input id="q-subjective-answer" type="text" placeholder="예: 사과, apple, 애플 (쉼표로 구분)" class="flex-1 rounded-2xl px-3 py-1.5 text-sm outline-none">
+          </div>
+          <p id="subjective-answer-help" class="text-[11px] text-white/50 ml-2">* 여러 정답을 인정하려면 쉼표(`,`)로 구분하여 입력해 주세요.</p>
+        </div>
+
+        <div class="flex items-center gap-2 ml-auto">
+          <label class="text-sm font-bold text-white/70">제한시간(초):</label>
+          <input id="q-duration-input" type="number" value="30" min="5" max="180" class="w-16 rounded-2xl px-2 py-1 text-center font-bold">
+        </div>
+      </div>
+
+      <div class="glass rounded-2xl p-3 mb-3">
+        <p class="text-xs text-white/60 mb-2"><i class="fa-solid fa-photo-film mr-1"></i>사진 또는 영상 추가 (선택사항)</p>
+        <div class="flex gap-2 items-center flex-wrap">
+          <label class="text-xs glass rounded-2xl px-3 py-2 cursor-pointer font-bold">
+            <i class="fa-solid fa-image mr-1"></i>사진 선택
+            <input type="file" id="q-image-input" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
+          </label>
+          <input id="q-video-input" type="text" placeholder="유튜브 또는 영상 링크 URL" class="flex-1 min-w-[10rem] rounded-2xl px-3 py-2 text-xs outline-none">
+          <button onclick="clearMediaDraft()" class="text-xs text-rose-500 font-bold px-2">제거</button>
+        </div>
+        <img id="q-image-preview" class="hidden mt-2 rounded-xl max-h-32 mx-auto" />
+      </div>
+
+      <button onclick="addQuestionToDraft()" id="add-question-btn" class="glow-btn bg-gradient-to-r from-[var(--pastel-purple)] to-[var(--pastel-pink)] rounded-2xl py-3 font-bold w-full">
+        <i class="fa-solid fa-plus mr-1"></i> 문제 리스트에 추가
+      </button>
+      <button onclick="cancelQuestionEdit()" id="cancel-question-edit-btn" class="hidden mt-2 w-full glass rounded-2xl py-2 font-bold text-rose-500 text-sm">
+        <i class="fa-solid fa-xmark mr-1"></i> 문제 수정 취소
+      </button>
+    </div>
+
+    <div class="glass rounded-[1.9rem] p-5 mb-6">
+      <h3 class="font-bold mb-3 flex items-center gap-2"><i class="fa-solid fa-list-ol text-[var(--pastel-yellow)]"></i> 작성 중인 문제 목록 (<span id="draft-count">0</span>개)</h3>
+      <div id="draft-question-list" class="flex flex-col gap-2 max-h-60 overflow-y-auto"></div>
+      
+      <div class="flex gap-2 mt-3">
+        <button id="save-bank-btn" onclick="saveDraftQuiz()" class="glow-btn bg-gradient-to-r from-[var(--pastel-mint)] to-emerald-300 rounded-2xl py-3 font-bold flex-1">
+          <i class="fa-solid fa-floppy-disk mr-1"></i> 이 퀴즈를 문제 은행에 저장
+        </button>
+        <button id="cancel-edit-btn" onclick="cancelQuizEdit()" class="hidden glass rounded-2xl px-4 py-3 font-bold text-rose-500 hover:bg-rose-50">
+          수정 취소
+        </button>
+      </div>
+    </div>
+
+    <div class="glass rounded-[1.9rem] p-5 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-bold flex items-center gap-2"><i class="fa-solid fa-database text-[var(--pastel-pink)]"></i> 내 문제 은행</h3>
+      </div>
+      <p class="text-xs text-white/50 mb-3 font-bold">내가 만든 퀴즈만 표시됩니다. 다른 사용자의 문제는 목록에서 보이지 않습니다.</p>
+      <div id="quiz-bank-list" class="flex flex-col gap-2"></div>
+    </div>
+
+    
+
+  </section>
+
+  <section id="screen-host-lobby" class="hidden w-full min-h-screen px-4 py-8 flex flex-col items-center">
+    <p class="text-white/50 mb-1 font-bold pt-6">참가 코드 (PIN)</p>
+    <div id="lobby-pin" class="pin-digit text-6xl md:text-7xl font-extrabold neon-text mb-2">------</div>
+    <p class="text-white/40 text-sm mb-6"><i class="fa-solid fa-mobile-screen-button mr-1"></i>학생들에게 이 PIN을 알려주세요</p>
+
+    <div class="glass rounded-[1.9rem] px-6 py-3 mb-6 flex items-center gap-3">
+      <i class="fa-solid fa-users text-2xl text-[var(--pastel-blue)]"></i>
+      <span class="text-3xl font-bold" id="lobby-player-count">0</span>
+      <span class="text-white/60 font-bold">명 참가중</span>
+    </div>
+
+    <div id="lobby-player-grid" class="w-full max-w-4xl grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-8 px-2"></div>
+
+    <div class="flex flex-col sm:flex-row gap-3 items-center justify-center">
+      <button onclick="openTeamSetup()" class="glass rounded-[1.6rem] px-7 py-3.5 font-bold text-lg hover:scale-[1.02] transition-transform">
+        <i class="fa-solid fa-people-group mr-2 text-[var(--pastel-purple)]"></i><span id="game-mode-label">개인전</span> / 팀 설정
+      </button>
+      <button onclick="startCountdownAndStartGame()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] via-[var(--pastel-purple)] to-[var(--pastel-blue)] rounded-[1.9rem] px-10 py-4 font-display font-extrabold text-2xl">
+        <i class="fa-solid fa-play mr-2"></i>게임 시작
+      </button>
+    </div>
+
+    <div id="team-setup-modal" class="hidden fixed inset-0 z-[90] bg-black/35 backdrop-blur-sm p-4 overflow-y-auto">
+      <div class="w-full max-w-3xl mx-auto glass rounded-[2rem] p-5 md:p-7 mt-4 mb-8 text-gray-900 bg-white/95">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h3 class="font-display text-2xl font-extrabold">게임 방식 & 팀 설정</h3>
+            <p class="text-xs text-gray-500 font-bold mt-1">개인전은 기존 방식 그대로, 팀전은 팀 점수를 함께 집계합니다.</p>
+          </div>
+          <button onclick="closeTeamSetup()" class="w-10 h-10 rounded-full bg-gray-100 font-bold">×</button>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4 mb-5">
+          <div class="rounded-2xl border border-gray-200 p-4">
+            <label class="block text-sm font-extrabold mb-2">게임 방식</label>
+            <select id="game-mode-select" onchange="toggleTeamSetupFields()" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 font-bold bg-white">
+              <option value="individual">개인전</option>
+              <option value="team">팀전</option>
+            </select>
+          </div>
+          <div id="team-count-wrap" class="hidden rounded-2xl border border-gray-200 p-4">
+            <label class="block text-sm font-extrabold mb-2">팀 수</label>
+            <div class="flex items-center gap-2">
+              <input id="team-count-input" type="number" min="2" max="20" value="2" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 font-bold">
+              <button onclick="renderTeamSetupFields()" class="rounded-xl bg-gray-900 text-white px-4 py-2.5 font-bold">적용</button>
+            </div>
+          </div>
+          <div id="team-scoring-wrap" class="hidden rounded-2xl border border-gray-200 p-4 md:col-span-2">
+            <label class="block text-sm font-extrabold mb-2">팀 점수 방식</label>
+            <select id="team-scoring-select" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 font-bold bg-white">
+              <option value="sum">개인 점수 합산형 — 각자 푼 점수를 팀 점수에 합산</option>
+              <option value="shared">팀 공동답안형 — 팀에서 한 번 답하고 팀이 점수를 받음</option>
+            </select>
+            <p class="text-xs text-gray-500 font-bold mt-2">공동답안형에서는 팀원 중 한 명이 제출하면 그 문제가 팀 전체의 답변으로 처리됩니다.</p>
+          </div>
+        </div>
+        <div id="team-setup-fields" class="hidden mb-5"></div>
+        <div id="team-player-assignment" class="hidden">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-extrabold">학생 팀 배정</h4>
+            <span class="text-xs text-gray-500 font-bold">학생별로 팀을 선택하세요.</span>
+          </div>
+          <div id="team-player-list" class="grid sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto"></div>
+        </div>
+        <div class="flex gap-2 mt-6">
+          <button onclick="saveTeamSetup()" class="flex-1 rounded-2xl py-3.5 font-extrabold text-white bg-gray-900">설정 저장</button>
+          <button onclick="closeTeamSetup()" class="rounded-2xl px-5 py-3.5 font-bold bg-gray-100">취소</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-host-question" class="hidden w-full min-h-screen px-4 py-6 flex flex-col items-center">
+    <div class="w-full max-w-4xl flex items-center justify-between mb-4 pt-10 sm:pt-4">
+      <span class="glass rounded-full px-4 py-1.5 text-sm font-bold" id="host-q-index">문제 1</span>
+      <div class="flex items-center gap-3">
+        <button onclick="hostToggleTimer()" id="host-pause-btn" class="glass rounded-full w-10 h-10 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-pause"></i>
+        </button>
+        <div id="host-timer" class="glass rounded-full w-11 h-11 flex items-center justify-center font-extrabold text-lg text-amber-600">30</div>
+      </div>
+    </div>
+
+    <div id="host-media-wrap" class="media-container hidden glass rounded-[1.9rem] w-full max-w-4xl p-3 mb-4 flex items-center justify-center overflow-hidden"></div>
+
+    <div id="host-passage-wrap" class="hidden glass rounded-[1.9rem] w-full max-w-4xl p-5 mb-4 max-h-48 overflow-y-auto text-left bg-white/80">
+      <p id="host-passage-text" class="text-sm md:text-base leading-relaxed whitespace-pre-wrap font-medium"></p>
+    </div>
+
+    <div class="glass rounded-[1.9rem] w-full max-w-4xl p-6 md:p-8 mb-4 text-center">
+      <h2 id="host-question-text" class="font-display text-2xl md:text-3xl font-bold leading-snug"></h2>
+    </div>
+
+    <div id="host-choices-wrap" class="w-full max-w-4xl grid grid-cols-2 gap-3 mb-4">
+      <div id="host-choice-btn-0" class="shape-btn shape-red py-4 px-4 text-lg font-bold text-left justify-start"><span class="w-8 shrink-0 font-black">▲</span><span id="host-choice-0"></span></div>
+      <div id="host-choice-btn-1" class="shape-btn shape-orange py-4 px-4 text-lg font-bold text-left justify-start"><span class="w-8 shrink-0 font-black">◆</span><span id="host-choice-1"></span></div>
+      <div id="host-choice-btn-2" class="shape-btn shape-green py-4 px-4 text-lg font-bold text-left justify-start"><span class="w-8 shrink-0 font-black">●</span><span id="host-choice-2"></span></div>
+      <div id="host-choice-btn-3" class="shape-btn shape-blue py-4 px-4 text-lg font-bold text-left justify-start"><span class="w-8 shrink-0 font-black">■</span><span id="host-choice-3"></span></div>
+    </div>
+
+    <div id="host-subjective-notice" class="hidden glass rounded-[1.9rem] w-full max-w-4xl p-6 text-center mb-4">
+      <p class="text-lg font-bold text-[var(--pastel-purple)]"><i class="fa-solid fa-pen-clip mr-2"></i>학생들이 서술형 정답을 입력하고 있습니다...</p>
+    </div>
+
+    <div class="glass rounded-[1.9rem] px-6 py-2.5 flex items-center gap-3 mb-4">
+      <i class="fa-solid fa-paper-plane text-[var(--pastel-yellow)]"></i>
+      <span id="host-submitted-count" class="font-bold text-xl">0</span> / <span id="host-total-count">0</span> 명 제출완료
+    </div>
+
+    <button onclick="hostForceReveal()" class="glow-btn bg-gradient-to-r from-[var(--pastel-purple)] to-[var(--pastel-blue)] rounded-[1.6rem] px-6 py-2.5 font-bold text-sm">
+      <i class="fa-solid fa-forward-step mr-1"></i> 바로 정답 공개 및 채점
+    </button>
+  </section>
+
+  <section id="screen-host-reveal" class="hidden w-full min-h-screen px-4 py-8 flex flex-col items-center">
+    <h2 class="font-display text-2xl font-bold mb-1 pt-6"><i class="fa-solid fa-chart-simple mr-2 text-[var(--pastel-blue)]"></i>결과 확인</h2>
+    <p id="reveal-question-text" class="text-white/60 mb-2 text-center max-w-2xl font-bold"></p>
+    <p class="text-xs text-white/50 mb-6"><i class="fa-solid fa-hand-pointer mr-1"></i>보기를 클릭하면 선택한 학생 명단을 볼 수 있습니다.</p>
+
+    <div id="reveal-graph-wrap" class="w-full max-w-2xl flex flex-col gap-3 mb-8">
+      <div id="reveal-bar-0" onclick="showVotersForChoice(0)" class="glass rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform">
+        <div class="w-10 h-10 rounded-xl shape-red flex items-center justify-center font-black shrink-0 text-white">▲</div>
+        <div class="flex-1 flex flex-col gap-1">
+          <div class="flex justify-between items-center text-xs font-bold">
+            <span id="reveal-text-0" class="truncate pr-2"></span>
+            <span id="reveal-badge-0" class="hidden bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[10px] font-black">정답!</span>
+          </div>
+          <div class="h-6 bg-white/30 rounded-2xl overflow-hidden relative">
+            <div class="bar-fill h-full shape-red" style="width:0%"></div>
+          </div>
+        </div>
+        <span id="reveal-count-0" class="w-12 text-right font-extrabold text-sm">0명</span>
+      </div>
+
+      <div id="reveal-bar-1" onclick="showVotersForChoice(1)" class="glass rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform">
+        <div class="w-10 h-10 rounded-xl shape-orange flex items-center justify-center font-black shrink-0 text-white">◆</div>
+        <div class="flex-1 flex flex-col gap-1">
+          <div class="flex justify-between items-center text-xs font-bold">
+            <span id="reveal-text-1" class="truncate pr-2"></span>
+            <span id="reveal-badge-1" class="hidden bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[10px] font-black">정답!</span>
+          </div>
+          <div class="h-6 bg-white/30 rounded-2xl overflow-hidden relative">
+            <div class="bar-fill h-full shape-orange" style="width:0%"></div>
+          </div>
+        </div>
+        <span id="reveal-count-1" class="w-12 text-right font-extrabold text-sm">0명</span>
+      </div>
+
+      <div id="reveal-bar-2" onclick="showVotersForChoice(2)" class="glass rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform">
+        <div class="w-10 h-10 rounded-xl shape-green flex items-center justify-center font-black shrink-0 text-white">●</div>
+        <div class="flex-1 flex flex-col gap-1">
+          <div class="flex justify-between items-center text-xs font-bold">
+            <span id="reveal-text-2" class="truncate pr-2"></span>
+            <span id="reveal-badge-2" class="hidden bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[10px] font-black">정답!</span>
+          </div>
+          <div class="h-6 bg-white/30 rounded-2xl overflow-hidden relative">
+            <div class="bar-fill h-full shape-green" style="width:0%"></div>
+          </div>
+        </div>
+        <span id="reveal-count-2" class="w-12 text-right font-extrabold text-sm">0명</span>
+      </div>
+
+      <div id="reveal-bar-3" onclick="showVotersForChoice(3)" class="glass rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform">
+        <div class="w-10 h-10 rounded-xl shape-blue flex items-center justify-center font-black shrink-0 text-white">■</div>
+        <div class="flex-1 flex flex-col gap-1">
+          <div class="flex justify-between items-center text-xs font-bold">
+            <span id="reveal-text-3" class="truncate pr-2"></span>
+            <span id="reveal-badge-3" class="hidden bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[10px] font-black">정답!</span>
+          </div>
+          <div class="h-6 bg-white/30 rounded-2xl overflow-hidden relative">
+            <div class="bar-fill h-full shape-blue" style="width:0%"></div>
+          </div>
+        </div>
+        <span id="reveal-count-3" class="w-12 text-right font-extrabold text-sm">0명</span>
+      </div>
+    </div>
+
+    <div id="reveal-subjective-wrap" class="hidden w-full max-w-2xl glass rounded-[1.9rem] p-5 mb-8">
+      <h3 class="font-bold text-center mb-3">인정 답안: <span id="reveal-correct-subjective" class="text-emerald-600 font-extrabold"></span></h3>
+      <div id="subjective-answers-list" class="flex flex-col gap-2 max-h-60 overflow-y-auto"></div>
+    </div>
+
+    <button onclick="hostShowExplanation()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
+      문제 해설 보기 <i class="fa-solid fa-lightbulb ml-1"></i>
+    </button>
+  </section>
+
+  <section id="screen-question-explanation" class="hidden w-full min-h-screen px-6 py-8 flex flex-col items-center justify-center text-center">
+    <div class="w-full max-w-2xl">
+      <div class="text-5xl mb-4">💡</div>
+      <h2 class="font-display text-3xl font-extrabold neon-text mb-2">문제 해설</h2>
+      <p id="explanation-question-text" class="text-slate-700 text-sm md:text-base font-extrabold mb-5 leading-relaxed"></p>
+
+      <div class="glass rounded-[1.9rem] p-6 text-left mb-6">
+        <h3 class="font-bold text-lg mb-3">
+          <i class="fa-solid fa-lightbulb text-[var(--pastel-yellow)] mr-1"></i>
+          해설
+        </h3>
+        <p id="explanation-text" class="whitespace-pre-wrap leading-relaxed font-medium text-sm md:text-base"></p>
+        <p id="explanation-empty" class="hidden text-white/45 text-sm text-center py-4">등록된 해설이 없습니다.</p>
+      </div>
+
+      <div id="host-explanation-controls">
+        <button onclick="hostShowLeaderboard()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
+          순위 확인하기 <i class="fa-solid fa-arrow-right ml-1"></i>
+        </button>
+      </div>
+      <p id="student-explanation-wait" class="hidden text-white/50 text-sm font-bold">
+        선생님이 다음 화면을 준비 중입니다...
+      </p>
+    </div>
+  </section>
+
+  <section id="screen-leaderboard" class="hidden w-full min-h-screen px-4 py-8 flex flex-col items-center">
+    <h2 class="font-display text-3xl font-bold neon-text mb-6 pt-6"><i class="fa-solid fa-ranking-star mr-2"></i>실시간 순위</h2>
+    <div id="leaderboard-list" class="w-full max-w-xl flex flex-col gap-2 mb-8"></div>
+    <div id="host-leaderboard-controls" class="hidden">
+      <button onclick="hostNextQuestion()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
+        다음 문제 <i class="fa-solid fa-forward ml-1"></i>
+      </button>
+    </div>
+    <p id="student-leaderboard-wait" class="hidden text-white/50 text-sm font-bold">선생님이 다음 문제를 준비 중입니다...</p>
+  </section>
+
+  <section id="screen-podium" class="hidden w-full min-h-screen px-4 py-10 flex flex-col items-center justify-center overflow-y-auto relative">
+    <h2 class="font-display text-4xl font-extrabold neon-text mb-8"><i class="fa-solid fa-trophy mr-2"></i>최종 결과</h2>
+    
+    <div class="flex items-end gap-3 md:gap-6 mb-8" id="podium-wrap">
+      <div class="flex flex-col items-center">
+        <div class="text-3xl mb-1">🥈</div>
+        <div id="podium-name-2" class="font-bold mb-1 text-center max-w-[7rem] truncate"></div>
+        <div id="podium-score-2" class="text-sm font-extrabold text-slate-600 mb-1">0점</div>
+        <div class="podium-bar w-20 md:w-28 bg-gradient-to-t from-slate-300 to-slate-100 rounded-t-[1.5rem] flex items-start justify-center pt-2 font-extrabold text-slate-600" style="height:0px" id="podium-bar-2">2</div>
+      </div>
+      <div class="flex flex-col items-center">
+        <div class="text-4xl mb-1">👑</div>
+        <div id="podium-name-1" class="font-bold mb-1 text-center max-w-[8rem] truncate"></div>
+        <div id="podium-score-1" class="text-lg font-extrabold text-amber-700 mb-1">0점</div>
+        <div class="podium-bar w-24 md:w-32 bg-gradient-to-t from-[var(--pastel-yellow)] to-yellow-100 rounded-t-[1.5rem] flex items-start justify-center pt-2 font-extrabold text-amber-700" style="height:0px" id="podium-bar-1">1</div>
+      </div>
+      <div class="flex flex-col items-center">
+        <div class="text-2xl mb-1">🥉</div>
+        <div id="podium-name-3" class="font-bold mb-1 text-center max-w-[7rem] truncate"></div>
+        <div id="podium-score-3" class="text-sm font-extrabold text-amber-800 mb-1">0점</div>
+        <div class="podium-bar w-16 md:w-24 bg-gradient-to-t from-amber-400 to-amber-200 rounded-t-[1.5rem] flex items-start justify-center pt-2 font-extrabold text-amber-800" style="height:0px" id="podium-bar-3">3</div>
+      </div>
+    </div>
+
+    <div id="podium-runners-up-wrap" class="w-full max-w-md hidden mb-8">
+      <h3 class="text-xs font-bold text-white/50 mb-2 px-2"><i class="fa-solid fa-list mr-1"></i>전체 참가자 순위</h3>
+      <div id="podium-runners-up-list" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1"></div>
+    </div>
+
+    <button onclick="location.reload()" class="btn-reset rounded-[1.6rem] px-8 py-3.5 font-bold text-lg"><i class="fa-solid fa-rotate-left mr-2"></i>처음으로</button>
+  </section>
+
+  <section id="screen-student-join" class="hidden w-full min-h-screen px-6 py-8 flex flex-col items-center justify-center">
+    <h2 class="font-display text-3xl font-bold neon-text mb-5">게임 참가하기</h2>
+    <p class="text-sm text-white/60 mb-2 font-bold">캐릭터를 골라주세요</p>
+    <div id="avatar-picker" class="grid grid-cols-4 gap-2 mb-5 max-w-xs w-full"></div>
+
+    <input id="student-pin-input" type="tel" maxlength="6" placeholder="6자리 PIN 입력" class="pin-digit w-full max-w-xs text-center text-3xl font-bold rounded-[1.6rem] px-4 py-3 mb-3 tracking-widest">
+    <input id="student-nickname-input" type="text" maxlength="10" placeholder="닉네임 입력" class="w-full max-w-xs text-center text-lg rounded-[1.6rem] px-4 py-3 mb-5 font-bold">
+    <button id="student-join-btn" onclick="studentJoinRoom()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-10 py-3.5 font-bold text-lg w-full max-w-xs">
+      <i class="fa-solid fa-right-to-bracket mr-1"></i> 입장하기
+    </button>
+    <button onclick="goTo('screen-landing')" class="text-white/40 text-sm mt-6"><i class="fa-solid fa-arrow-left mr-1"></i>뒤로가기</button>
+  </section>
+
+  <section id="screen-student-lobby" class="hidden w-full min-h-screen px-6 flex flex-col items-center justify-center text-center">
+    <div class="fixed top-3 left-3 z-40 glass rounded-full px-3.5 py-1.5 flex items-center gap-1.5 font-bold text-xs sm:text-sm">
+      <i class="fa-solid fa-clock text-[var(--pastel-blue)]"></i> 대기시간: <span id="student-lobby-timer" class="text-amber-600 font-extrabold">0</span>초
+    </div>
+    <div id="student-lobby-avatar" class="text-6xl mb-4 idle-bob">🎮</div>
+    <h2 class="font-display text-2xl font-bold mb-2">입장 완료!</h2>
+    <p class="text-white/60 mb-1 font-bold">닉네임: <span id="student-my-nickname" class="font-extrabold text-[var(--pastel-yellow)]"></span></p>
+    <p id="student-my-team" class="hidden text-sm font-extrabold mt-1"></p>
+    <p class="text-white/50 text-sm">선생님이 게임을 시작할 때까지 기다려주세요</p>
+  </section>
+
+  <section id="screen-student-question" class="hidden w-full min-h-screen px-4 py-6 flex flex-col max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-3 pt-10 sm:pt-4">
+      <span class="glass rounded-full px-4 py-1.5 text-sm font-bold" id="student-q-index">문제 1</span>
+      <div class="glass rounded-full px-3.5 py-1 font-extrabold text-base text-amber-600 flex items-center gap-1.5">
+        <i class="fa-solid fa-clock"></i> <span id="student-timer">30</span>초
+      </div>
+    </div>
+
+    <div id="student-media-wrap" class="media-container hidden glass rounded-[1.6rem] p-2 mb-3 flex items-center justify-center overflow-hidden"></div>
+
+    <div id="student-passage-wrap" class="hidden glass rounded-[1.6rem] p-4 mb-3 max-h-40 overflow-y-auto text-left bg-white/80">
+      <p id="student-passage-text" class="text-xs md:text-sm leading-relaxed whitespace-pre-wrap font-medium"></p>
+    </div>
+
+    <div class="glass rounded-[1.6rem] p-4 mb-4 text-center">
+      <h2 id="student-question-text" class="font-display text-lg md:text-xl font-bold leading-snug"></h2>
+    </div>
+
+    <div id="student-team-answer-note" class="hidden w-full glass rounded-2xl px-4 py-3 mb-3 text-center text-sm font-extrabold text-indigo-700 bg-indigo-50/80">
+      👥 팀 공동답안형: 팀원 중 한 명이 제출하면 팀 전체 답변으로 처리됩니다.
+    </div>
+
+    <div id="student-choices-wrap" class="flex-1 grid grid-cols-2 gap-3">
+      <div onclick="studentSubmitAnswer(0)" id="student-btn-0" class="shape-btn shape-red p-4 flex-col gap-1 text-center">
+        <span class="text-xl font-black">▲</span>
+        <span id="student-choice-0" class="text-base md:text-lg font-bold"></span>
+      </div>
+      <div onclick="studentSubmitAnswer(1)" id="student-btn-1" class="shape-btn shape-orange p-4 flex-col gap-1 text-center">
+        <span class="text-xl font-black">◆</span>
+        <span id="student-choice-1" class="text-base md:text-lg font-bold"></span>
+      </div>
+      <div onclick="studentSubmitAnswer(2)" id="student-btn-2" class="shape-btn shape-green p-4 flex-col gap-1 text-center">
+        <span class="text-xl font-black">●</span>
+        <span id="student-choice-2" class="text-base md:text-lg font-bold"></span>
+      </div>
+      <div onclick="studentSubmitAnswer(3)" id="student-btn-3" class="shape-btn shape-blue p-4 flex-col gap-1 text-center">
+        <span class="text-xl font-black">■</span>
+        <span id="student-choice-3" class="text-base md:text-lg font-bold"></span>
+      </div>
+    </div>
+
+    <div id="student-ox-wrap" class="hidden flex-1 grid grid-cols-1 gap-3">
+      <div onclick="studentSubmitAnswer(0)" id="student-btn-o" class="shape-btn shape-o text-5xl font-black py-8 justify-center"><i class="fa-regular fa-circle"></i></div>
+      <div onclick="studentSubmitAnswer(1)" id="student-btn-x" class="shape-btn shape-x text-5xl font-black py-8 justify-center"><i class="fa-solid fa-xmark"></i></div>
+    </div>
+
+    <div id="student-subjective-wrap" class="hidden flex-1 flex flex-col gap-3">
+      <textarea id="student-subjective-input" rows="3" placeholder="정답을 자유롭게 입력하세요..." class="w-full rounded-2xl p-4 font-bold text-base outline-none"></textarea>
+      <button onclick="studentSubmitSubjective()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-2xl py-3.5 font-bold text-lg">정답 제출하기</button>
+    </div>
+  </section>
+
+  <section id="screen-student-waiting" class="hidden w-full min-h-screen px-6 flex flex-col items-center justify-center text-center relative">
+    <div class="fixed top-3 left-3 z-40 glass rounded-full px-3.5 py-1.5 flex items-center gap-1.5 font-extrabold text-sm text-amber-600">
+      <i class="fa-solid fa-clock"></i> <span id="student-waiting-timer">30</span>초
+    </div>
+    <div class="idle-bob text-6xl mb-4">📨</div>
+    <h2 class="font-bold text-xl">제출 완료! 잠시만 기다려주세요</h2>
+    <p id="student-waiting-message" class="text-white/50 mt-1 text-sm">다른 친구들이 답을 고르고 있어요...</p>
+  </section>
+
+  <section id="screen-student-result" class="hidden w-full min-h-screen px-6 flex flex-col items-center justify-center text-center">
+    <div id="student-result-icon" class="text-7xl mb-4">✅</div>
+    <h2 id="student-result-text" class="font-display text-3xl font-extrabold mb-2">정답입니다!</h2>
+    <p id="student-result-score" class="text-2xl font-bold text-[var(--pastel-yellow)] mb-1">+0점</p>
+  </section>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getDatabase, ref, set, get, update, push, remove, onValue, onDisconnect, runTransaction
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, signOut, updateProfile
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB1dyDKNhx4PUF7ys8rrtwsBGemRjUqt-0",
+  authDomain: "pobibig-68ec7.firebaseapp.com",
+  databaseURL: "https://pobibig-68ec7-default-rtdb.firebaseio.com",
+  projectId: "pobibig-68ec7",
+  storageBucket: "pobibig-68ec7.firebasestorage.app",
+  messagingSenderId: "32659641281",
+  appId: "1:32659641281:web:558cacc31b944158dfd540"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+let quizBankUnsubscribe = null;
+
+const AVATAR_LIST = ['🐻','🐧','🐻‍❄️','🐴','🦕','🐱','🐶','🦊'];
+
+const state = {
+  isHost: false,
+  pin: null,
+  playerId: null,
+  nickname: null,
+  selectedAvatar: AVATAR_LIST[0],
+  quiz: null,
+  currentIndex: 0,
+  players: {},
+  roomData: {},
+  timerInterval: null,
+  lobbyTimerInterval: null,
+  lobbySeconds: 0,
+  localTimeLeft: 0,
+  timerRunning: false,
+  draftQuestions: [],
+  draftImage: null,
+  editingQuizId: null, // 기존 퀴즈 세트 수정 중일 때 저장되는 퀴즈 ID
+  editingQuestionIndex: null, // 문제 목록 내에서 개별 문제를 수정 중일 때의 인덱스
+  quizBankCache: {},
+  lastMediaKey: null,
+  lastCountdownVal: null,
+  ownerId: localStorage.getItem('quizrush_owner_id') || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+  legacyOwnerId: localStorage.getItem('quizrush_owner_id') || null
+};
+localStorage.setItem('quizrush_owner_id', state.ownerId);
+
+/* 오디오 효과음 처리 */
+let globalAudioCtx = null;
+function getCtx(){
+  if(!globalAudioCtx){
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+    if(AudioCtxClass) globalAudioCtx = new AudioCtxClass();
+  }
+  if(globalAudioCtx && globalAudioCtx.state === 'suspended'){
+    globalAudioCtx.resume();
+  }
+  return globalAudioCtx;
+}
+
+function playTone(freq, duration, type='sine', volume=0.15, delay=0){
+  try{
+    const ctx = getCtx();
+    if(!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type; osc.frequency.value = freq; gain.gain.value = volume;
+    osc.connect(gain); gain.connect(ctx.destination);
+    const startAt = ctx.currentTime + delay;
+    
+    gain.gain.setValueAtTime(volume, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+    
+    osc.start(startAt); osc.stop(startAt + duration + 0.02);
+  }catch(e){}
+}
+
+function playClick(){ playTone(880, 0.08, 'triangle', 0.12); }
+function playCountdownBeep(){ playTone(1046.5, 0.1, 'sine', 0.15); }
+function playCorrect(){ playTone(523.25,0.12,'sine',0.15); playTone(659.25,0.12,'sine',0.15,0.1); playTone(783.99,0.2,'sine',0.15,0.2); }
+function playWrong(){ playTone(220,0.12,'sawtooth',0.15); playTone(174.61,0.2,'sawtooth',0.15,0.1); }
+function playTimeUp(){ playTone(311.13, 0.15, 'triangle', 0.15); playTone(155.56, 0.25, 'triangle', 0.15, 0.12); }
+function playRoundStart(){ playTone(523.25,0.08,'sine',0.12); playTone(659.25,0.08,'sine',0.12,0.06); playTone(783.99,0.15,'sine',0.15,0.12); }
+
+window.playClick = playClick;
+
+/* 응답자 명단 팝업 처리 */
+function showVotersForChoice(choiceIdx){
+  const data = state.roomData;
+  if(!data || !data.quiz) return;
+  const q = data.quiz.questions[data.currentIndex];
+  if(!q) return;
+
+  const modal = document.getElementById('voter-modal');
+  const titleEl = document.getElementById('modal-choice-title');
+  const listEl = document.getElementById('modal-voter-list');
+  
+  const choiceSymbols = ['▲', '◆', '●', '■'];
+  const choiceText = q.type === 'ox' ? (choiceIdx === 0 ? 'O' : 'X') : (q.choices[choiceIdx] || '');
+  
+  titleEl.innerHTML = `<span class="font-extrabold text-[var(--pastel-purple)]">${choiceSymbols[choiceIdx]} ${escapeHtml(choiceText)}</span> 선택 학생`;
+  listEl.innerHTML = '';
+
+  const voters = [];
+  Object.values(data.players || {}).forEach(p => {
+    const ans = p.answers && p.answers[data.currentIndex];
+    if(ans && ans.choice === choiceIdx){
+      voters.push(p);
+    }
+  });
+
+  if(voters.length === 0){
+    listEl.innerHTML = `<p class="text-white/40 text-center py-4 text-sm font-bold">선택한 학생이 없습니다.</p>`;
+  } else {
+    voters.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'glass rounded-xl px-3 py-2 text-sm font-bold flex items-center justify-between';
+      item.innerHTML = `<span>${p.avatar} ${escapeHtml(p.nickname)}</span><span class="text-xs text-white/50">+${p.lastGain||0}점</span>`;
+      listEl.appendChild(item);
+    });
+  }
+
+  modal.classList.remove('hidden');
+  playClick();
+}
+window.showVotersForChoice = showVotersForChoice;
+
+function closeVoterModal(){
+  document.getElementById('voter-modal').classList.add('hidden');
+}
+window.closeVoterModal = closeVoterModal;
+
+/* 화면 전환 함수 (+ 화면 이동 시 재생 중인 영상/유튜브 소리를 강제로 정지) */
+function stopAllMedia(){
+  document.querySelectorAll('#host-media-wrap video, #student-media-wrap video').forEach(v => {
+    try{ v.pause(); v.currentTime = 0; }catch(e){}
+  });
+  document.querySelectorAll('#host-media-wrap iframe, #student-media-wrap iframe').forEach(f => {
+    f.src = 'about:blank';
+  });
+  state.lastMediaKey = null;
+}
+function goTo(screenId){
+  const screens = document.querySelectorAll('#app > section');
+  const current = Array.from(screens).find(el => {
+    const cs = getComputedStyle(el);
+    return cs.display !== 'none';
+  });
+
+  if(current && current.id !== screenId &&
+     (current.id === 'screen-host-question' || current.id === 'screen-student-question')){
+    stopAllMedia();
+  }
+
+  // class="hidden"에 Tailwind/CSS 우선순위가 섞여도 화면 전환이 확실히 되도록
+  // inline display를 함께 초기화합니다.
+  screens.forEach(el => {
+    el.classList.add('hidden');
+    el.style.display = 'none';
+  });
+
+  const nextScreen = document.getElementById(screenId);
+  if(nextScreen){
+    nextScreen.classList.remove('hidden');
+    nextScreen.style.removeProperty('display');
+  } else {
+    console.error('화면을 찾을 수 없습니다:', screenId);
+  }
+}
+window.goTo = goTo;
+
+function generatePIN(){ return String(Math.floor(100000 + Math.random() * 900000)); }
+
+function handleQuestionTypeChange(){
+  const type = document.getElementById('q-type-select').value;
+  const passageWrap = document.getElementById('q-passage-wrap');
+  const choices4 = document.getElementById('q-choices-4');
+  const correctWrap = document.getElementById('correct-select-wrap');
+  const subjWrap = document.getElementById('correct-subjective-wrap');
+  const correctSelect = document.getElementById('q-correct-select');
+  const answerLabel = document.getElementById('subjective-answer-label');
+  const answerInput = document.getElementById('q-subjective-answer');
+  const answerHelp = document.getElementById('subjective-answer-help');
+  passageWrap.classList.toggle('hidden', type !== 'long_passage');
+  if(type === 'choice' || type === 'long_passage'){
+    choices4.classList.remove('hidden'); correctWrap.classList.remove('hidden'); subjWrap.classList.add('hidden');
+    correctSelect.innerHTML = `<option value="0">① 번 (빨강)</option><option value="1">② 번 (주황)</option><option value="2">③ 번 (초록)</option><option value="3">④ 번 (파랑)</option>`;
+  } else if(type === 'ox'){
+    choices4.classList.add('hidden'); correctWrap.classList.remove('hidden'); subjWrap.classList.add('hidden');
+    correctSelect.innerHTML = `<option value="0">O (참)</option><option value="1">X (거짓)</option>`;
+  } else if(type === 'subjective'){
+    choices4.classList.add('hidden'); correctWrap.classList.add('hidden'); subjWrap.classList.remove('hidden');
+    answerLabel.innerText='정답/유사답안:'; answerInput.placeholder='예: 사과, apple, 애플 (쉼표로 구분)'; answerHelp.innerText='* 여러 정답을 인정하려면 쉼표(,)로 구분해 주세요.';
+  } else if(type === 'opinion'){
+    choices4.classList.add('hidden'); correctWrap.classList.add('hidden'); subjWrap.classList.remove('hidden');
+    answerLabel.innerText='교사용 메모(선택):'; answerInput.placeholder='정답은 없습니다. 필요하다면 토론 포인트/참고 메모를 입력하세요.'; answerHelp.innerText='* 학생의 생각을 자유롭게 받는 문제입니다. 자동 정답 판정과 자동 점수는 없습니다.';
+  }
+}
+window.handleQuestionTypeChange = handleQuestionTypeChange;
+
+function handleImageSelect(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    state.draftImage = e.target.result;
+    const preview = document.getElementById('q-image-preview');
+    preview.src = state.draftImage;
+    preview.classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+window.handleImageSelect = handleImageSelect;
+
+function clearMediaDraft(){
+  state.draftImage = null;
+  document.getElementById('q-image-input').value = '';
+  document.getElementById('q-video-input').value = '';
+  const preview = document.getElementById('q-image-preview');
+  preview.src = ''; preview.classList.add('hidden');
+}
+window.clearMediaDraft = clearMediaDraft;
+
+/* 문제 작성 폼을 빈 상태로 되돌리는 헬퍼 (추가 완료 후, 수정 취소 시 공용으로 사용) */
+function resetQuestionForm(){
+  document.getElementById('q-type-select').value = 'choice';
+  handleQuestionTypeChange();
+  document.getElementById('q-text-input').value = '';
+   document.getElementById('q-explanation-input').value = '';
+  document.getElementById('q-passage-input').value = '';
+  document.getElementById('q-choice-0').value = '';
+  document.getElementById('q-choice-1').value = '';
+  document.getElementById('q-choice-2').value = '';
+  document.getElementById('q-choice-3').value = '';
+  document.getElementById('q-correct-select').value = '0';
+  document.getElementById('q-subjective-answer').value = '';
+  document.getElementById('q-duration-input').value = '30';
+  clearMediaDraft();
+}
+
+function addQuestionToDraft(){
+  const type = document.getElementById('q-type-select').value;
+  const passage = document.getElementById('q-passage-input').value.trim();
+  const text = document.getElementById('q-text-input').value.trim();
+   const explanation = document.getElementById('q-explanation-input').value.trim();
+  const duration = parseInt(document.getElementById('q-duration-input').value, 10) || 30;
+  const videoUrl = document.getElementById('q-video-input').value.trim();
+
+  if(!text){ alert('질문을 입력해주세요.'); return; }
+
+  let question = { type, text, duration };
+   if(explanation) question.explanation = explanation;
+  if(passage) question.passage = passage;
+  if(state.draftImage) question.image = state.draftImage;
+  if(videoUrl) question.videoUrl = videoUrl;
+
+  if(type === 'choice' || type === 'long_passage'){
+    const c0 = document.getElementById('q-choice-0').value.trim();
+    const c1 = document.getElementById('q-choice-1').value.trim();
+    const c2 = document.getElementById('q-choice-2').value.trim();
+    const c3 = document.getElementById('q-choice-3').value.trim();
+    if(!c0 || !c1 || !c2 || !c3){ alert('4개 보기를 모두 입력해주세요.'); return; }
+    question.choices = [c0, c1, c2, c3];
+    question.correctIndex = parseInt(document.getElementById('q-correct-select').value, 10);
+  } else if(type === 'ox'){
+    question.choices = ['O', 'X'];
+    question.correctIndex = parseInt(document.getElementById('q-correct-select').value, 10);
+  } else if(type === 'subjective'){
+    const rawAnswer = document.getElementById('q-subjective-answer').value.trim();
+    if(!rawAnswer){ alert('모범 답안 및 유사 답안을 입력해주세요.'); return; }
+    const answersArray = rawAnswer.split(',').map(a => a.trim().toLowerCase()).filter(a => a.length > 0);
+    question.subjectiveAnswer = rawAnswer;
+    question.subjectiveAnswers = answersArray;
+  } else if(type === 'opinion'){
+    const teacherNote = document.getElementById('q-subjective-answer').value.trim();
+    if(teacherNote) question.teacherNote = teacherNote;
+  }
+
+  if(state.editingQuestionIndex !== null){
+    // 문제 목록에서 특정 문제를 "수정" 버튼으로 불러온 경우: 새로 추가하지 않고 해당 위치를 교체
+    state.draftQuestions[state.editingQuestionIndex] = question;
+    state.editingQuestionIndex = null;
+    document.getElementById('add-question-btn').innerHTML = '<i class="fa-solid fa-plus mr-1"></i> 문제 리스트에 추가';
+    document.getElementById('cancel-question-edit-btn').classList.add('hidden');
+  } else {
+    state.draftQuestions.push(question);
+  }
+
+  resetQuestionForm();
+  renderDraftList();
+  playClick();
+}
+window.addQuestionToDraft = addQuestionToDraft;
+
+/* 문제 목록에서 개별 문제를 "수정" 버튼으로 눌렀을 때: 해당 문제 내용을 폼에 불러옴 */
+function editDraftQuestion(index){
+  const q = state.draftQuestions[index];
+  if(!q) return;
+  state.editingQuestionIndex = index;
+
+  document.getElementById('q-type-select').value = q.type;
+  handleQuestionTypeChange();
+
+  document.getElementById('q-text-input').value = q.text || '';
+   document.getElementById('q-explanation-input').value = q.explanation || '';
+  document.getElementById('q-passage-input').value = q.passage || '';
+  document.getElementById('q-duration-input').value = q.duration || 30;
+
+  if(q.type === 'choice' || q.type === 'long_passage'){
+    document.getElementById('q-choice-0').value = (q.choices && q.choices[0]) || '';
+    document.getElementById('q-choice-1').value = (q.choices && q.choices[1]) || '';
+    document.getElementById('q-choice-2').value = (q.choices && q.choices[2]) || '';
+    document.getElementById('q-choice-3').value = (q.choices && q.choices[3]) || '';
+    document.getElementById('q-correct-select').value = q.correctIndex;
+  } else if(q.type === 'ox'){
+    document.getElementById('q-correct-select').value = q.correctIndex;
+  } else if(q.type === 'subjective'){
+    document.getElementById('q-subjective-answer').value = q.subjectiveAnswer || '';
+  } else if(q.type === 'opinion'){
+    document.getElementById('q-subjective-answer').value = q.teacherNote || '';
+  }
+
+  if(q.image){
+    state.draftImage = q.image;
+    const preview = document.getElementById('q-image-preview');
+    preview.src = q.image;
+    preview.classList.remove('hidden');
+  } else {
+    state.draftImage = null;
+    const preview = document.getElementById('q-image-preview');
+    preview.src = '';
+    preview.classList.add('hidden');
+  }
+  document.getElementById('q-video-input').value = q.videoUrl || '';
+
+  document.getElementById('add-question-btn').innerHTML = '<i class="fa-solid fa-check mr-1"></i> 문제 수정 완료';
+  document.getElementById('cancel-question-edit-btn').classList.remove('hidden');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  playClick();
+}
+window.editDraftQuestion = editDraftQuestion;
+
+/* 개별 문제 수정을 취소하고 폼을 새 문제 추가 상태로 되돌림 */
+function cancelQuestionEdit(){
+  state.editingQuestionIndex = null;
+  resetQuestionForm();
+  document.getElementById('add-question-btn').innerHTML = '<i class="fa-solid fa-plus mr-1"></i> 문제 리스트에 추가';
+  document.getElementById('cancel-question-edit-btn').classList.add('hidden');
+}
+window.cancelQuestionEdit = cancelQuestionEdit;
+
+/* 작성 중인 문제 목록 안에서 순서를 위/아래로 이동 */
+function moveDraftQuestion(index, direction){
+  const newIndex = index + direction;
+  if(newIndex < 0 || newIndex >= state.draftQuestions.length) return;
+  const arr = state.draftQuestions;
+  const tmp = arr[index];
+  arr[index] = arr[newIndex];
+  arr[newIndex] = tmp;
+
+  if(state.editingQuestionIndex === index) state.editingQuestionIndex = newIndex;
+  else if(state.editingQuestionIndex === newIndex) state.editingQuestionIndex = index;
+
+  renderDraftList();
+  playClick();
+}
+window.moveDraftQuestion = moveDraftQuestion;
+
+function renderDraftList(){
+  const wrap = document.getElementById('draft-question-list');
+  document.getElementById('draft-count').innerText = state.draftQuestions.length;
+  wrap.innerHTML = '';
+  const typeLabels = { choice: '객관식', long_passage: '긴글형', ox: 'OX', subjective: '서술형', opinion: '생각·토론' };
+
+  state.draftQuestions.forEach((q, i) => {
+    const row = document.createElement('div');
+    row.className = 'glass rounded-2xl px-3 py-2 flex items-center justify-between text-sm gap-2';
+
+    const label = typeLabels[q.type] || q.type;
+    const textSpan = document.createElement('span');
+    textSpan.className = 'font-bold truncate flex-1';
+    textSpan.innerText = `[${label}] ${i + 1}. ${q.text}`;
+    row.appendChild(textSpan);
+
+    const btnWrap = document.createElement('div');
+    btnWrap.className = 'flex items-center gap-1 shrink-0';
+
+    const upBtn = document.createElement('button');
+    upBtn.innerHTML = '<i class="fa-solid fa-arrow-up"></i>';
+    upBtn.className = 'p-1.5 rounded-lg ' + (i === 0 ? 'opacity-20 pointer-events-none text-white/40' : 'text-white/60 hover:text-ink hover:bg-white/40');
+    upBtn.onclick = () => moveDraftQuestion(i, -1);
+
+    const downBtn = document.createElement('button');
+    downBtn.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
+    downBtn.className = 'p-1.5 rounded-lg ' + (i === state.draftQuestions.length - 1 ? 'opacity-20 pointer-events-none text-white/40' : 'text-white/60 hover:text-ink hover:bg-white/40');
+    downBtn.onclick = () => moveDraftQuestion(i, 1);
+
+    const editBtn = document.createElement('button');
+    editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+    editBtn.className = 'p-1.5 rounded-lg text-indigo-500 hover:bg-indigo-50';
+    editBtn.onclick = () => editDraftQuestion(i);
+
+    const delBtn = document.createElement('button');
+    delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    delBtn.className = 'p-1.5 rounded-lg text-rose-500 hover:bg-rose-50';
+    delBtn.onclick = () => {
+      state.draftQuestions.splice(i, 1);
+      if(state.editingQuestionIndex === i) cancelQuestionEdit();
+      renderDraftList();
+    };
+
+    btnWrap.appendChild(upBtn);
+    btnWrap.appendChild(downBtn);
+    btnWrap.appendChild(editBtn);
+    btnWrap.appendChild(delBtn);
+    row.appendChild(btnWrap);
+    wrap.appendChild(row);
+  });
+}
+
+function escapeHtml(str){ const d = document.createElement('div'); d.innerText = str; return d.innerHTML; }
+
+async function saveDraftQuiz(){
+  const title = document.getElementById('quiz-title-input').value.trim() || '퀴즈 문제집';
+  if(state.draftQuestions.length === 0){ alert('최소 1개 이상 문제를 등록하세요.'); return; }
+
+  if(state.editingQuizId) {
+    // 기존 퀴즈 세트 수정 업데이트
+    await update(ref(db, `quizBank/${state.editingQuizId}`), {
+      title, questions: state.draftQuestions, ownerId: state.ownerId, updatedAt: Date.now()
+    });
+    alert('퀴즈가 수정되었습니다!');
+  } else {
+    // 새 퀴즈 추가
+    await push(ref(db, 'quizBank'), { title, questions: state.draftQuestions, ownerId: state.ownerId, createdAt: Date.now() });
+    alert('새 퀴즈가 저장되었습니다!');
+  }
+
+  cancelQuizEdit();
+  playClick();
+}
+window.saveDraftQuiz = saveDraftQuiz;
+
+/* 퀴즈 은행에서 개별 퀴즈 수정 모드로 불러오기 */
+function editQuizSet(quizId) {
+  const quiz = state.quizBankCache[quizId];
+  if(!quiz) return;
+
+  state.editingQuizId = quizId;
+  state.editingQuestionIndex = null;
+  state.draftQuestions = JSON.parse(JSON.stringify(quiz.questions || []));
+
+  document.getElementById('quiz-title-input').value = quiz.title || '';
+  document.getElementById('editing-badge').classList.remove('hidden');
+  document.getElementById('cancel-edit-btn').classList.remove('hidden');
+  document.getElementById('save-bank-btn').innerHTML = '<i class="fa-solid fa-check mr-1"></i> 수정사항 저장하기';
+  document.getElementById('form-header-title').innerHTML = '<i class="fa-solid fa-pen-to-square text-[var(--pastel-blue)]"></i> 퀴즈 세트 수정';
+
+  renderDraftList();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  playClick();
+}
+window.editQuizSet = editQuizSet;
+
+/* 퀴즈 수정 모드 취소 */
+function cancelQuizEdit() {
+  state.editingQuizId = null;
+  state.draftQuestions = [];
+  cancelQuestionEdit();
+  document.getElementById('quiz-title-input').value = '';
+  document.getElementById('editing-badge').classList.add('hidden');
+  document.getElementById('cancel-edit-btn').classList.add('hidden');
+  document.getElementById('save-bank-btn').innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i> 이 퀴즈를 문제 은행에 저장';
+  document.getElementById('form-header-title').innerHTML = '<i class="fa-solid fa-pen-to-square text-[var(--pastel-blue)]"></i> 새 문제 추가';
+  renderDraftList();
+}
+window.cancelQuizEdit = cancelQuizEdit;
+
+/* 퀴즈 삭제 */
+async function deleteQuizSet(quizId) {
+  if(confirm('정말 이 퀴즈 세트를 문제 은행에서 삭제하시겠습니까?')) {
+    await remove(ref(db, `quizBank/${quizId}`));
+    if(state.editingQuizId === quizId) {
+      cancelQuizEdit();
+    }
+    playClick();
+  }
+}
+window.deleteQuizSet = deleteQuizSet;
+
+function subscribeQuizBank(){
+  if(quizBankUnsubscribe){
+    quizBankUnsubscribe();
+    quizBankUnsubscribe = null;
+  }
+  if(!auth.currentUser){
+    state.quizBankCache = {};
+    renderQuizBank();
+    return;
+  }
+  quizBankUnsubscribe = onValue(ref(db, 'quizBank'), async (snapshot) => {
+    const bank = snapshot.val() || {};
+    const legacyUpdates = {};
+    Object.entries(bank).forEach(([id, quiz]) => {
+      if(quiz && quiz.ownerId === state.legacyOwnerId && quiz.ownerId !== state.ownerId){
+        legacyUpdates[`quizBank/${id}/ownerId`] = state.ownerId;
+        quiz.ownerId = state.ownerId;
+      }
+    });
+    if(Object.keys(legacyUpdates).length > 0){
+      try{ await update(ref(db), legacyUpdates); }catch(e){ console.warn('기존 문제 계정 이전 실패:', e); }
+    }
+    state.quizBankCache = bank;
+    renderQuizBank();
+  });
+}
+function renderQuizBank(){
+  const bank = state.quizBankCache || {};
+  const ids = Object.keys(bank).filter(id => {
+    const quiz = bank[id];
+    return quiz && quiz.ownerId === state.ownerId;
+  });
+  const wrap = document.getElementById('quiz-bank-list');
+  wrap.innerHTML = '';
+  if(ids.length === 0){
+    wrap.innerHTML = `<p class="text-center text-sm font-bold text-white/50 py-4">저장된 퀴즈가 없습니다. 위에서 새로 만들어보세요!</p>`;
+    return;
+  }
+  ids.forEach(id => {
+    const quiz = bank[id];
+    const row = document.createElement('div');
+    row.className = 'glass rounded-[1.6rem] px-4 py-3 flex items-center justify-between flex-wrap gap-2';
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'flex-1 min-w-[120px]';
+    infoDiv.innerHTML = `
+      <p class="font-bold text-ink">${escapeHtml(quiz.title)}</p>
+      <p class="text-xs text-white/40 font-bold">${(quiz.questions||[]).length}문제</p>
+    `;
+
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'flex items-center gap-1.5 shrink-0';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'glass px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-600 hover:bg-indigo-50';
+    editBtn.innerHTML = '<i class="fa-solid fa-pen mr-1"></i>수정';
+    editBtn.onclick = () => editQuizSet(id);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'glass px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-50';
+    delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    delBtn.onclick = () => deleteQuizSet(id);
+
+    // [버그 수정] 이 버튼은 기존에 onclick="createRoomWithQuiz(state.quizBankCache['${id}'])" 형태의
+    // 인라인 문자열로 작성되어 있었습니다. 이 파일은 <script type="module">로 로드되기 때문에
+    // 최상위에서 선언한 state 변수는 모듈 스코프에 갇혀 전역(window)에서 접근할 수 없고,
+    // 인라인 onclick은 전역 스코프에서 실행되므로 "state is not defined" 오류가 발생해
+    // 방 만들기 버튼이 동작하지 않았습니다. 아래처럼 JS에서 직접 이벤트 핸들러를 연결하면
+    // 클로저로 quiz 객체를 안전하게 참조할 수 있어 문제가 해결됩니다.
+    const createBtn = document.createElement('button');
+    createBtn.className = 'glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-xl px-3 py-1.5 text-xs font-bold ml-1';
+    createBtn.innerText = '방 만들기';
+    createBtn.onclick = () => createRoomWithQuiz(quiz);
+
+    btnGroup.appendChild(editBtn);
+    btnGroup.appendChild(delBtn);
+    btnGroup.appendChild(createBtn);
+
+    row.appendChild(infoDiv);
+    row.appendChild(btnGroup);
+    wrap.appendChild(row);
+  });
+}
+
+async function createRoomWithQuiz(quiz){
+  if(!quiz){ alert('퀴즈 정보를 불러오지 못했습니다. 다시 시도해주세요.'); return; }
+  const pin = generatePIN();
+  state.pin = pin; state.isHost = true; state.quiz = quiz; state.currentIndex = 0;
+  state.lastMediaKey = null;
+  try{
+    await set(ref(db, `rooms/${pin}`), {
+      hostId: auth.currentUser ? auth.currentUser.uid : 'host_'+Date.now(),
+      state: 'lobby',
+      quiz,
+      currentIndex: 0,
+      timeLeft: 0,
+      timerRunning: false,
+      gameMode: 'individual',
+      teamScoringMode: 'sum',
+      teams: {},
+      teamAnswers: {},
+      players: {}
+    });
+    document.getElementById('lobby-pin').innerText = pin;
+    goTo('screen-host-lobby');
+    subscribeRoom(pin);
+  }catch(err){
+    console.error('방 생성 실패:', err);
+    alert('방 생성에 실패했습니다. 인터넷 연결 및 Firebase 설정을 확인해주세요.');
+  }
+}
+window.createRoomWithQuiz = createRoomWithQuiz;
+
+function subscribeRoom(pin){
+  onValue(ref(db, `rooms/${pin}`), (snapshot) => {
+    const data = snapshot.val();
+    if(!data) return;
+    state.roomData = data;
+    state.players = data.players || {};
+    handleRoomUpdate(data);
+  });
+}
+
+function handleRoomUpdate(data){
+  if(state.isHost){
+    renderLobbyPlayers(data.players || {});
+    const modeLabel=document.getElementById('game-mode-label');
+    if(modeLabel) modeLabel.innerText=data.gameMode==='team'?'팀전':'개인전';
+  }
+  
+  syncCountdownDisplay(data.countdown);
+
+  if(data.state === 'lobby'){
+    if(state.isHost) goTo('screen-host-lobby');
+    else {
+      goTo('screen-student-lobby');
+      if(state.playerId && data.players?.[state.playerId]){
+        const me=data.players[state.playerId], team=getTeamInfo(data,me), avatarEl=document.getElementById('student-lobby-avatar');
+        const teamEl=document.getElementById('student-my-team');
+        if(team){
+          avatarEl.style.border=`5px solid ${team.color}`; avatarEl.style.boxShadow=`0 0 22px ${team.color}77`; avatarEl.style.borderRadius='9999px'; avatarEl.style.padding='8px';
+          teamEl.innerText=`${team.name}`; teamEl.style.color=team.color; teamEl.classList.remove('hidden');
+        } else { avatarEl.style.border='none'; avatarEl.style.boxShadow='none'; avatarEl.style.padding='0'; teamEl.classList.add('hidden'); }
+      }
+    }
+  } else if(data.state === 'question'){
+    renderQuestionScreen(data);
+  } else if(data.state === 'reveal'){
+    renderRevealScreen(data);
+  } else if(data.state === 'explanation'){
+    renderExplanationScreen(data);
+  } else if(data.state === 'leaderboard'){
+    renderLeaderboardScreen(data);
+  } else if(data.state === 'podium'){
+    renderPodiumScreen(data);
+  }
+  syncTimerDisplay(data);
+}
+
+function syncCountdownDisplay(val) {
+  const overlay = document.getElementById('countdown-overlay');
+  const text = document.getElementById('countdown-text');
+
+  if (val !== undefined && val !== null && val > 0) {
+    overlay.classList.add('active');
+    text.innerText = val === 1 ? "시작!" : (val - 1);
+    
+    if (state.lastCountdownVal !== val) {
+      if (val === 1) playRoundStart();
+      else playCountdownBeep();
+      state.lastCountdownVal = val;
+    }
+  } else {
+    overlay.classList.remove('active');
+    state.lastCountdownVal = null;
+  }
+}
+
+function renderLobbyPlayers(players){
+  const grid = document.getElementById('lobby-player-grid');
+  grid.innerHTML = '';
+  const ids = Object.keys(players);
+  document.getElementById('lobby-player-count').innerText = ids.length;
+  ids.forEach(pid => {
+    const p = players[pid]; const team=getTeamInfo(state.roomData,p);
+    const card = document.createElement('div');
+    card.className = 'player-card glass rounded-[1.6rem] px-2 py-3 text-center font-bold text-sm';
+    card.style.border = team ? `3px solid ${team.color}` : '2px solid rgba(255,255,255,.35)';
+    card.style.boxShadow = team ? `0 0 16px ${team.color}55` : '';
+    card.innerHTML = `<div class="text-2xl mb-1">${p.avatar||'🎮'}</div><div>${escapeHtml(p.nickname||'')}</div>${team?`<div class="text-[10px] mt-1 font-black" style="color:${team.color}">${escapeHtml(team.name)}</div>`:''}`;
+    grid.appendChild(card);
+  });
+}
+function openTeamSetup(){
+  const data = state.roomData || {};
+  document.getElementById('team-setup-modal').classList.remove('hidden');
+  document.getElementById('game-mode-select').value = data.gameMode || 'individual';
+  document.getElementById('team-count-input').value = Math.max(2, Object.keys(data.teams || {}).length || 2);
+  document.getElementById('team-scoring-select').value = data.teamScoringMode || 'sum';
+  toggleTeamSetupFields();
+}
+window.openTeamSetup = openTeamSetup;
+
+function closeTeamSetup(){ document.getElementById('team-setup-modal').classList.add('hidden'); }
+window.closeTeamSetup = closeTeamSetup;
+
+function toggleTeamSetupFields(){
+  const teamMode = document.getElementById('game-mode-select').value === 'team';
+  document.getElementById('team-count-wrap').classList.toggle('hidden', !teamMode);
+  document.getElementById('team-setup-fields').classList.toggle('hidden', !teamMode);
+  document.getElementById('team-player-assignment').classList.toggle('hidden', !teamMode);
+  document.getElementById('team-scoring-wrap').classList.toggle('hidden', !teamMode);
+  if(teamMode){ renderTeamSetupFields(); renderTeamPlayerAssignment(); }
+}
+window.toggleTeamSetupFields = toggleTeamSetupFields;
+
+function teamDefaultColors(){ return ['#ff6b9a','#8b7cff','#4aa8ff','#35c98a','#ffb84d','#b36cff','#ff6b6b','#22b8cf']; }
+
+function renderTeamSetupFields(){
+  if(document.getElementById('game-mode-select').value !== 'team') return;
+  const count = Math.min(20, Math.max(1, parseInt(document.getElementById('team-count-input').value || '2', 10)));
+  const existing = state.roomData?.teams || {};
+  const colors = teamDefaultColors();
+  const wrap = document.getElementById('team-setup-fields');
+  wrap.innerHTML = '';
+  for(let i=0;i<count;i++){
+    const id = `team${i+1}`;
+    const t = existing[id] || {name:`${i+1}팀`, color:colors[i%colors.length]};
+    const row = document.createElement('div');
+    row.className='grid grid-cols-[1fr_72px] gap-2 items-center rounded-2xl border border-gray-200 p-3 mb-2';
+    row.innerHTML=`<div><label class="text-xs font-bold text-gray-500 block mb-1">팀 ${i+1} 이름</label><input id="team-name-${i}" maxlength="20" value="${escapeHtml(t.name)}" class="w-full rounded-xl border border-gray-200 px-3 py-2 font-bold text-gray-900"></div><div><label class="text-xs font-bold text-gray-500 block mb-1">색상</label><input id="team-color-${i}" type="color" value="${t.color||colors[i%colors.length]}" class="w-full h-10 rounded-xl border-0 p-1 bg-white"></div>`;
+    wrap.appendChild(row);
+  }
+  renderTeamPlayerAssignment();
+}
+window.renderTeamSetupFields = renderTeamSetupFields;
+
+function renderTeamPlayerAssignment(){
+  const list=document.getElementById('team-player-list'); if(!list) return;
+  const players=state.players||{}; const count=Math.min(20,Math.max(2,parseInt(document.getElementById('team-count-input').value||'2',10)));
+  const teams=state.roomData?.teams||{}; const currentNames={}; Object.entries(teams).forEach(([id,t])=>currentNames[id]=t.name); list.innerHTML='';
+  Object.entries(players).forEach(([pid,p])=>{
+    const row=document.createElement('div'); row.className='rounded-2xl border border-gray-200 p-3 flex items-center gap-2 bg-white';
+    const current=p.teamId||'';
+    let opts='<option value="">미배정</option>';
+    for(let i=1;i<=count;i++){ const id=`team${i}`; const name=currentNames[id]||teams[id]?.name||`${i}팀`; opts+=`<option value="${id}" ${current===id?'selected':''}>${escapeHtml(name)}</option>`; }
+    row.innerHTML=`<div class="text-2xl shrink-0">${p.avatar||'🎮'}</div><div class="flex-1 min-w-0"><div class="font-extrabold truncate">${escapeHtml(p.nickname||'')}</div><select data-team-player="${pid}" class="mt-1 w-full rounded-xl border border-gray-200 px-2 py-1.5 text-sm font-bold bg-white">${opts}</select></div>`;
+    list.appendChild(row);
+  });
+}
+window.renderTeamPlayerAssignment = renderTeamPlayerAssignment;
+
+async function saveTeamSetup(){
+  const mode=document.getElementById('game-mode-select').value;
+  if(mode==='individual'){
+    await update(ref(db,`rooms/${state.pin}`),{gameMode:'individual',teamScoringMode:'sum',teams:{}});
+    closeTeamSetup(); document.getElementById('game-mode-label').innerText='개인전'; return;
+  }
+  const count=Math.min(20,Math.max(2,parseInt(document.getElementById('team-count-input').value||'2',10)));
+  const teams={};
+  for(let i=0;i<count;i++){
+    const name=document.getElementById(`team-name-${i}`)?.value.trim()||`${i+1}팀`;
+    const color=document.getElementById(`team-color-${i}`)?.value||teamDefaultColors()[i%8];
+    teams[`team${i+1}`]={name,color};
+  }
+  const updates={};
+  document.querySelectorAll('[data-team-player]').forEach(sel=>{ updates[`rooms/${state.pin}/players/${sel.dataset.teamPlayer}/teamId`]=sel.value||null; });
+  const scoringMode=document.getElementById('team-scoring-select').value || 'sum';
+  Object.keys(teams).forEach(id=>{ teams[id].sharedScore=Number(state.roomData?.teams?.[id]?.sharedScore || 0); });
+  updates[`rooms/${state.pin}/gameMode`]='team'; updates[`rooms/${state.pin}/teamScoringMode`]=scoringMode; updates[`rooms/${state.pin}/teams`]=teams;
+  await update(ref(db),updates);
+  closeTeamSetup();
+  document.getElementById('game-mode-label').innerText='팀전';
+}
+window.saveTeamSetup = saveTeamSetup;
+
+function getTeamInfo(data,p){
+  if(!data || data.gameMode!=='team' || !p?.teamId) return null;
+  return (data.teams||{})[p.teamId] || null;
+}
+function teamScore(data,teamId){
+  const team=(data.teams||{})[teamId];
+  if(data.teamScoringMode==='shared') return Number(team?.sharedScore||0);
+  return Object.values(data.players||{}).filter(p=>p.teamId===teamId).reduce((s,p)=>s+(Number(p.score)||0),0);
+}
+
+function startCountdownAndStartGame() {
+  if(state.roomData.gameMode==='team'){
+    const players=Object.values(state.roomData.players||{});
+    const unassigned=players.filter(p=>!p.teamId);
+    if(unassigned.length){ alert(`아직 팀이 정해지지 않은 학생이 ${unassigned.length}명 있습니다. 팀 설정에서 배정해주세요.`); openTeamSetup(); return; }
+  }
+  let count = 4;
+  const timer = setInterval(async () => {
+    count--;
+    if (count > 0) {
+      await update(ref(db, `rooms/${state.pin}`), { countdown: count });
+    } else {
+      clearInterval(timer);
+      await update(ref(db, `rooms/${state.pin}`), { countdown: null });
+      await hostStartGame();
+    }
+  }, 1000);
+}
+window.startCountdownAndStartGame = startCountdownAndStartGame;
+
+async function hostStartGame(){
+  await update(ref(db, `rooms/${state.pin}`), { state: 'question', currentIndex: 0 });
+  await startQuestionTimer(0);
+}
+
+async function startQuestionTimer(index){
+  const q = state.quiz.questions[index];
+  state.localTimeLeft = q.duration;
+  state.timerRunning = true;
+  await update(ref(db, `rooms/${state.pin}`), { timeLeft: q.duration, timerRunning: true });
+  runHostTimerLoop();
+}
+
+function runHostTimerLoop(){
+  clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(async () => {
+    if(!state.timerRunning) return;
+    state.localTimeLeft -= 1;
+    if(state.localTimeLeft <= 0){
+      clearInterval(state.timerInterval);
+      await update(ref(db, `rooms/${state.pin}`), { timeLeft: 0, timerRunning: false });
+      playTimeUp();
+      revealResults();
+      return;
+    }
+    await update(ref(db, `rooms/${state.pin}`), { timeLeft: state.localTimeLeft });
+  }, 1000);
+}
+
+function hostToggleTimer(){
+  state.timerRunning = !state.timerRunning;
+  update(ref(db, `rooms/${state.pin}`), { timerRunning: state.timerRunning });
+}
+window.hostToggleTimer = hostToggleTimer;
+
+async function hostForceReveal(){
+  clearInterval(state.timerInterval);
+  state.timerRunning = false;
+  await update(ref(db, `rooms/${state.pin}`), { timeLeft: 0, timerRunning: false });
+  revealResults();
+}
+window.hostForceReveal = hostForceReveal;
+
+async function revealResults(){
+  const idx=state.currentIndex, q=state.quiz.questions[idx], players=state.players, updates={}, distribution=[0,0,0,0];
+  const sharedTeamMode=state.roomData?.gameMode==='team'&&state.roomData?.teamScoringMode==='shared';
+  const scoreForAnswer=(ans)=>{
+    if(!ans) return {gained:0,correct:false};
+    let correct=false;
+    if(q.type==='choice'||q.type==='long_passage'||q.type==='ox'){ distribution[ans.choice]=(distribution[ans.choice]||0)+1; correct=ans.choice===q.correctIndex; }
+    else if(q.type==='subjective'){
+      const text=String(ans.text||'').trim().toLowerCase(); correct=Array.isArray(q.subjectiveAnswers)?q.subjectiveAnswers.includes(text):text===String(q.subjectiveAnswer||'').trim().toLowerCase();
+    }
+    if(q.type==='opinion') return {gained:0,correct:false};
+    if(!correct) return {gained:0,correct:false};
+    const ratio=Math.max(0,Math.min(1,Number(ans.timeLeft||0)/Math.max(1,q.duration)));
+    return {gained:Math.round(500+ratio*500),correct:true};
+  };
+  if(sharedTeamMode){
+    const teamAnswers=state.roomData?.teamAnswers?.[idx]||{};
+    for(const [teamId,team] of Object.entries(state.roomData?.teams||{})){
+      const ans=teamAnswers[teamId], result=scoreForAnswer(ans);
+      if(result.gained) updates[`rooms/${state.pin}/teams/${teamId}/sharedScore`]=Number(team.sharedScore||0)+result.gained;
+      Object.entries(players).filter(([,p])=>p.teamId===teamId).forEach(([pid])=>{ updates[`rooms/${state.pin}/players/${pid}/lastGain`]=result.gained; updates[`rooms/${state.pin}/players/${pid}/lastCorrect`]=result.correct; });
+    }
+  } else {
+    Object.entries(players).forEach(([pid,p])=>{
+      const result=scoreForAnswer(p.answers&&p.answers[idx]);
+      updates[`rooms/${state.pin}/players/${pid}/score`]=(p.score||0)+result.gained;
+      updates[`rooms/${state.pin}/players/${pid}/lastGain`]=result.gained;
+      updates[`rooms/${state.pin}/players/${pid}/lastCorrect`]=result.correct;
+    });
+  }
+  updates[`rooms/${state.pin}/distribution`]=distribution; updates[`rooms/${state.pin}/state`]='reveal';
+  await update(ref(db),updates);
+}
+
+async function hostShowExplanation(){
+  await update(ref(db, `rooms/${state.pin}`), { state: 'explanation' });
+}
+window.hostShowExplanation = hostShowExplanation;
+
+function hostShowLeaderboard(){ update(ref(db, `rooms/${state.pin}`), { state: 'leaderboard' }); }
+window.hostShowLeaderboard = hostShowLeaderboard;
+
+async function hostNextQuestion(){
+  const nextIdx = state.currentIndex + 1;
+  if(nextIdx >= state.quiz.questions.length){
+    await update(ref(db, `rooms/${state.pin}`), { state: 'podium' });
+  } else {
+    state.currentIndex = nextIdx;
+    await update(ref(db, `rooms/${state.pin}`), { state: 'question', currentIndex: nextIdx });
+    await startQuestionTimer(nextIdx);
+    playRoundStart();
+  }
+}
+window.hostNextQuestion = hostNextQuestion;
+
+function youtubeEmbedUrl(url){
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{6,})/);
+  return m ? `https://www.youtube.com/embed/${m[1]}?enablejsapi=1` : null;
+}
+
+function renderMediaInto(wrapId, q, mediaKey){
+  const wrap = document.getElementById(wrapId);
+  if(!wrap) return;
+
+  if(state.lastMediaKey === mediaKey && wrap.children.length > 0){
+    wrap.classList.remove('hidden');
+    return;
+  }
+
+  wrap.innerHTML = '';
+  state.lastMediaKey = mediaKey;
+
+  if(q.image){
+    wrap.classList.remove('hidden');
+    const img = document.createElement('img');
+    img.src = q.image; img.className = 'max-h-48 w-auto rounded-xl object-contain';
+    wrap.appendChild(img);
+  } else if(q.videoUrl){
+    wrap.classList.remove('hidden');
+    const yt = youtubeEmbedUrl(q.videoUrl);
+    if(yt){
+      const iframe = document.createElement('iframe');
+      iframe.src = yt; iframe.className = 'w-full aspect-video rounded-xl max-h-52';
+      iframe.allow = 'autoplay; encrypted-media'; iframe.allowFullscreen = true;
+      wrap.appendChild(iframe);
+    } else {
+      const video = document.createElement('video');
+      video.src = q.videoUrl; video.controls = true; video.playsInline = true;
+      video.className = 'max-h-48 w-auto rounded-xl';
+      wrap.appendChild(video);
+      video.play().catch(() => {});
+    }
+  } else {
+    wrap.classList.add('hidden');
+  }
+}
+
+function renderQuestionScreen(data){
+  state.currentIndex = data.currentIndex;
+  const q = data.quiz.questions[data.currentIndex];
+  const total = Object.keys(data.players || {}).length;
+  const answered = Object.values(data.players || {}).filter(p => p.answers && p.answers[data.currentIndex] !== undefined).length;
+  const mediaKey = `${data.currentIndex}_${q.image||''}_${q.videoUrl||''}`;
+
+  if(state.isHost){
+    goTo('screen-host-question');
+    document.getElementById('host-q-index').innerText = `문제 ${data.currentIndex + 1} / ${data.quiz.questions.length}`;
+    document.getElementById('host-question-text').innerText = q.text;
+    document.getElementById('host-submitted-count').innerText = answered;
+    document.getElementById('host-total-count').innerText = total;
+
+    const passageWrap = document.getElementById('host-passage-wrap');
+    if(q.passage){ passageWrap.classList.remove('hidden'); document.getElementById('host-passage-text').innerText = q.passage; }
+    else { passageWrap.classList.add('hidden'); }
+
+    renderMediaInto('host-media-wrap', q, mediaKey);
+
+    const choicesWrap = document.getElementById('host-choices-wrap');
+    const subjNotice = document.getElementById('host-subjective-notice');
+
+    if(q.type === 'choice' || q.type === 'long_passage'){
+      choicesWrap.classList.remove('hidden'); subjNotice.classList.add('hidden');
+      choicesWrap.className = q.type === 'choice' ? 'w-full max-w-4xl grid grid-cols-2 gap-3 mb-4' : 'w-full max-w-4xl flex flex-col gap-2.5 mb-4';
+      [0,1,2,3].forEach(i => {
+        document.getElementById(`host-choice-btn-${i}`).classList.remove('hidden');
+        document.getElementById(`host-choice-${i}`).innerText = q.choices[i];
+      });
+    } else if(q.type === 'ox'){
+      choicesWrap.classList.remove('hidden'); subjNotice.classList.add('hidden');
+      choicesWrap.className = 'w-full max-w-4xl grid grid-cols-2 gap-3 mb-4';
+      [0,1].forEach(i => {
+        document.getElementById(`host-choice-btn-${i}`).classList.remove('hidden');
+        document.getElementById(`host-choice-${i}`).innerText = q.choices[i];
+      });
+      [2,3].forEach(i => document.getElementById(`host-choice-btn-${i}`).classList.add('hidden'));
+    } else if(q.type === 'subjective' || q.type === 'opinion'){
+      choicesWrap.classList.add('hidden'); subjNotice.classList.remove('hidden');
+      const noticeTitle=document.querySelector('#host-subjective-notice h3');
+      if(noticeTitle) noticeTitle.innerText=q.type==='opinion'?'💭 생각·토론형: 정답 없이 자유롭게 의견을 제출합니다.':'✍️ 서술형: 학생들이 답안을 제출하고 있습니다.';
+    }
+  } else {
+    if(state._lastRenderedQIndex !== data.currentIndex){
+      state._lastRenderedQIndex = data.currentIndex;
+      state._hasSubmittedCurrent = false;
+      goTo('screen-student-question');
+    }
+    if(!state._hasSubmittedCurrent) goTo('screen-student-question');
+
+    document.getElementById('student-q-index').innerText = `문제 ${data.currentIndex + 1} / ${data.quiz.questions.length}`;
+    document.getElementById('student-question-text').innerText = q.text;
+
+    const passageWrap = document.getElementById('student-passage-wrap');
+    if(q.passage){ passageWrap.classList.remove('hidden'); document.getElementById('student-passage-text').innerText = q.passage; }
+    else { passageWrap.classList.add('hidden'); }
+
+    renderMediaInto('student-media-wrap', q, mediaKey);
+
+    const choicesWrap = document.getElementById('student-choices-wrap');
+    const oxWrap = document.getElementById('student-ox-wrap');
+    const subjWrap = document.getElementById('student-subjective-wrap');
+    const teamNote = document.getElementById('student-team-answer-note');
+    const sharedTeam = data.gameMode === 'team' && data.teamScoringMode === 'shared';
+    if(teamNote) teamNote.classList.toggle('hidden', !sharedTeam);
+    if(q.type === 'choice' || q.type === 'long_passage'){
+      choicesWrap.classList.remove('hidden'); oxWrap.classList.add('hidden'); subjWrap.classList.add('hidden');
+      choicesWrap.className = q.type === 'choice' ? 'flex-1 grid grid-cols-2 gap-3' : 'flex-1 flex flex-col gap-2.5';
+      [0,1,2,3].forEach(i => document.getElementById(`student-choice-${i}`).innerText = q.choices[i]);
+    } else if(q.type === 'ox'){
+      choicesWrap.classList.add('hidden'); oxWrap.classList.remove('hidden'); subjWrap.classList.add('hidden');
+    } else if(q.type === 'subjective' || q.type === 'opinion'){
+      choicesWrap.classList.add('hidden'); oxWrap.classList.add('hidden'); subjWrap.classList.remove('hidden');
+      document.querySelector('#student-subjective-wrap button').innerText = q.type === 'opinion' ? '생각 제출하기' : '정답 제출하기';
+      document.getElementById('student-subjective-input').placeholder = q.type === 'opinion' ? '내 생각을 자유롭게 작성하세요...' : '정답을 자유롭게 입력하세요...';
+    }
+  }
+}
+
+function renderExplanationScreen(data){
+  const idx = data.currentIndex;
+  const q = data.quiz.questions[idx];
+  const screen = document.getElementById('screen-question-explanation');
+  if(!screen) return;
+
+  goTo('screen-question-explanation');
+
+  document.getElementById('explanation-question-text').innerText =
+    q.text ? `문제 ${idx + 1} · ${q.text}` : `문제 ${idx + 1}`;
+
+  const textEl = document.getElementById('explanation-text');
+  const emptyEl = document.getElementById('explanation-empty');
+
+  if(q.explanation){
+    textEl.innerText = q.explanation;
+    textEl.classList.remove('hidden');
+    emptyEl.classList.add('hidden');
+  } else {
+    textEl.innerText = '';
+    textEl.classList.add('hidden');
+    emptyEl.classList.remove('hidden');
+  }
+
+  const hostControls = document.getElementById('host-explanation-controls');
+  const studentWait = document.getElementById('student-explanation-wait');
+
+  if(state.isHost){
+    hostControls.classList.remove('hidden');
+    studentWait.classList.add('hidden');
+  } else {
+    hostControls.classList.add('hidden');
+    studentWait.classList.remove('hidden');
+  }
+}
+
+function renderRevealScreen(data){
+  const idx = data.currentIndex;
+  const q = data.quiz.questions[idx];
+
+  if(state.isHost){
+    goTo('screen-host-reveal');
+    document.getElementById('reveal-question-text').innerText = q.text;
+    const graphWrap = document.getElementById('reveal-graph-wrap');
+    const subjWrap = document.getElementById('reveal-subjective-wrap');
+
+    if(q.type === 'subjective' || q.type === 'opinion'){
+      graphWrap.classList.add('hidden'); subjWrap.classList.remove('hidden');
+      document.getElementById('reveal-correct-subjective').innerText=q.type==='opinion'?'정답 없음 · 학생들의 생각을 확인해보세요.':(q.subjectiveAnswer||'');
+      const list=document.getElementById('subjective-answers-list'); list.innerHTML='';
+      const shared=data.gameMode==='team'&&data.teamScoringMode==='shared';
+      if(shared){ Object.entries(data.teams||{}).forEach(([tid,team])=>{ const ans=data.teamAnswers?.[idx]?.[tid]; if(!ans)return; const d=document.createElement('div'); d.className='glass rounded-xl p-2.5 text-sm font-bold'; d.style.border=`2px solid ${team.color}`; const txt=ans.text??(ans.choice!==undefined?(q.choices?.[ans.choice]||''):''); d.innerHTML=`<div class="flex justify-between mb-1"><span style="color:${team.color}">${escapeHtml(team.name)}</span><span class="text-xs text-white/50">${escapeHtml(ans.submittedNickname||'')}</span></div><div class="whitespace-pre-wrap">${escapeHtml(txt)}</div>`; list.appendChild(d); }); }
+      else { Object.values(data.players||{}).forEach(p=>{ const ans=p.answers&&p.answers[idx]; if(!ans)return; const d=document.createElement('div'); d.className='glass rounded-xl p-2.5 text-sm flex justify-between font-bold gap-3'; const txt=ans.text??(ans.choice!==undefined?(q.choices?.[ans.choice]||''):''); const r=q.type==='opinion'?'의견':(p.lastCorrect?'정답':'오답'); const c=q.type==='opinion'?'text-indigo-500':(p.lastCorrect?'text-emerald-500':'text-rose-500'); d.innerHTML=`<span>${escapeHtml(p.nickname)}: ${escapeHtml(txt)}</span><span class="${c}">${r}</span>`; list.appendChild(d); }); }
+    } else {
+      graphWrap.classList.remove('hidden'); subjWrap.classList.add('hidden');
+      const dist = data.distribution || [0,0,0,0];
+      const total = dist.reduce((a,b)=>a+b,0) || 1;
+
+      [0,1,2,3].forEach(i => {
+        const wrap = document.getElementById(`reveal-bar-${i}`);
+        if(q.type === 'ox' && i >= 2){ wrap.classList.add('hidden'); return; }
+        wrap.classList.remove('hidden');
+
+        const choiceText = q.type === 'ox' ? (i === 0 ? 'O' : 'X') : (q.choices[i] || '');
+        document.getElementById(`reveal-text-${i}`).innerText = choiceText;
+
+        const isCorrect = i === q.correctIndex;
+        const badge = document.getElementById(`reveal-badge-${i}`);
+        if(isCorrect){
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+
+        const count = dist[i] || 0;
+        document.getElementById(`reveal-count-${i}`).innerText = `${count}명`;
+
+        const fill = wrap.querySelector('.bar-fill');
+        fill.style.width = Math.round((count / total) * 100) + '%';
+      });
+    }
+  } else {
+    if(state.playerId && data.players && data.players[state.playerId]){
+      const me = data.players[state.playerId];
+      goTo('screen-student-result');
+      const icon = document.getElementById('student-result-icon');
+      const text = document.getElementById('student-result-text');
+      const score = document.getElementById('student-result-score');
+
+      const currentQ=data.quiz.questions[data.currentIndex];
+      if(currentQ.type==='opinion'){ icon.innerText='💭'; text.innerText='생각이 제출되었습니다!'; playClick(); score.innerText='+0점 · 정답이 없는 의견형 문제'; }
+      else if(data.gameMode==='team'&&data.teamScoringMode==='shared'){ const team=getTeamInfo(data,me); if(me.lastCorrect){ icon.innerText='✅'; text.innerText='우리 팀 정답!'; playCorrect(); } else { icon.innerText='❌'; text.innerText='우리 팀의 답이 공개되었습니다.'; playWrong(); } score.innerText=`${team?.name||'우리 팀'} · ${teamScore(data,me.teamId)}점`; }
+      else if(me.lastCorrect){ icon.innerText='✅'; text.innerText='정답입니다!'; playCorrect(); score.innerText=`+${me.lastGain||0}점 (총 ${me.score||0}점)`; }
+      else { icon.innerText='❌'; text.innerText='오답입니다!'; playWrong(); score.innerText=`+${me.lastGain||0}점 (총 ${me.score||0}점)`; }
+    }
+  }
+}
+
+function renderLeaderboardScreen(data){
+  goTo('screen-leaderboard');
+  const list = document.getElementById('leaderboard-list'); list.innerHTML = '';
+  document.getElementById('host-leaderboard-controls').classList.toggle('hidden', !state.isHost);
+  document.getElementById('student-leaderboard-wait').classList.toggle('hidden', state.isHost);
+
+  if(data.gameMode === 'team'){
+    const teams=Object.entries(data.teams||{}).map(([id,t])=>({id,...t,score:teamScore(data,id)})).filter(t=>Object.values(data.players||{}).some(p=>p.teamId===t.id)).sort((a,b)=>b.score-a.score);
+    teams.forEach((t,i)=>{
+      const members=Object.values(data.players||{}).filter(p=>p.teamId===t.id);
+      const row=document.createElement('div'); row.className='glass rounded-[1.6rem] px-4 py-3 font-bold'; row.style.border=`3px solid ${t.color}`;
+      row.innerHTML=`<div class="flex items-center justify-between"><div class="flex items-center gap-3"><span class="w-6">${i+1}</span><span class="w-4 h-4 rounded-full" style="background:${t.color}"></span><span>${escapeHtml(t.name)}</span></div><span>${t.score}점</span></div><div class="text-xs text-white/55 mt-2 pl-9">${members.map(p=>escapeHtml(p.nickname)).join(' · ')}</div>`;
+      list.appendChild(row);
+    });
+    const divider=document.createElement('div'); divider.className='text-xs font-extrabold text-white/45 mt-3 mb-1'; divider.innerText='개인 점수'; list.appendChild(divider);
+  }
+
+  if(data.gameMode==='team'&&data.teamScoringMode==='shared'){
+    const teams=Object.entries(data.teams||{}).map(([id,t])=>({id,...t,score:teamScore(data,id),members:Object.values(data.players||{}).filter(p=>p.teamId===id)})).filter(t=>t.members.length).sort((a,b)=>b.score-a.score);
+    teams.forEach((t,i)=>{ const row=document.createElement('div'); row.className='glass rounded-[1.6rem] px-4 py-3 font-bold'; row.style.border=`3px solid ${t.color}`; row.innerHTML=`<div class="flex items-center justify-between"><div class="flex items-center gap-3"><span class="w-6">${i+1}</span><span>👥</span><span style="color:${t.color}">${escapeHtml(t.name)}</span></div><span>${t.score}점</span></div><div class="text-xs text-white/55 mt-2 pl-9">${t.members.map(p=>escapeHtml(p.nickname)).join(' · ')}</div>`; list.appendChild(row); });
+  } else {
+    const ranked = Object.entries(data.players||{}).map(([pid,p])=>({pid,...p})).sort((a,b)=>(b.score||0)-(a.score||0));
+    ranked.forEach((p,i)=>{ const team=getTeamInfo(data,p); const row=document.createElement('div'); row.className='glass rounded-[1.6rem] px-4 py-3 flex items-center justify-between font-bold'; row.style.border=team?`2px solid ${team.color}`:''; row.innerHTML=`<div class="flex items-center gap-3"><span class="w-6">${i+1}</span><span>${p.avatar||'🎮'}</span><span>${escapeHtml(p.nickname||'')}</span>${team?`<span class="text-[10px] font-black px-2 py-1 rounded-full" style="background:${team.color}22;color:${team.color}">${escapeHtml(team.name)}</span>`:''}</div><span>${p.score||0}점</span>`; list.appendChild(row); });
+  }
+}
+function renderPodiumScreen(data){
+  goTo('screen-podium');
+  const teamMode=data.gameMode==='team';
+  const ranked=teamMode
+    ? Object.entries(data.teams||{}).map(([id,t])=>({pid:id,avatar:'👥',nickname:t.name,score:teamScore(data,id),color:t.color,members:Object.values(data.players||{}).filter(p=>p.teamId===id)})).filter(t=>t.members.length).sort((a,b)=>b.score-a.score)
+    : Object.entries(data.players||{}).map(([pid,p])=>({pid,...p})).sort((a,b)=>(b.score||0)-(a.score||0));
+
+  [1,2,3].forEach((rank)=>{
+    const p=ranked[rank-1];
+    const nameEl=document.getElementById(`podium-name-${rank}`), scoreEl=document.getElementById(`podium-score-${rank}`), bar=document.getElementById(`podium-bar-${rank}`);
+    nameEl.innerText=p ? `${p.avatar||'🎮'} ${p.nickname}` : '-';
+    scoreEl.innerText=p ? `${p.score||0}점` : '0점';
+    bar.style.height=p ? (rank===1?180:rank===2?120:80)+'px' : '30px';
+    if(teamMode && p){ nameEl.style.color=p.color; bar.style.borderTop=`4px solid ${p.color}`; }
+    else { nameEl.style.color=''; bar.style.borderTop=''; }
+  });
+
+  const runnersUpWrap=document.getElementById('podium-runners-up-wrap');
+  const runnersUpList=document.getElementById('podium-runners-up-list'); runnersUpList.innerHTML='';
+  if(ranked.length>3){
+    runnersUpWrap.classList.remove('hidden');
+    for(let i=3;i<ranked.length;i++){
+      const p=ranked[i], row=document.createElement('div'); row.className='glass rounded-2xl px-4 py-2.5 flex items-center justify-between font-bold text-sm';
+      const color=teamMode?p.color:null; if(color) row.style.border=`2px solid ${color}`;
+      row.innerHTML=`<div class="flex items-center gap-3"><span class="w-6 text-white/50 text-xs font-black">${i+1}위</span><span>${p.avatar||'🎮'} ${escapeHtml(p.nickname)}</span></div><span class="${teamMode?'':'text-[var(--pastel-purple)]'}" ${color?`style="color:${color}"`:''}>${p.score||0}점</span>`;
+      runnersUpList.appendChild(row);
+    }
+  }else runnersUpWrap.classList.add('hidden');
+
+  if(typeof confetti==='function') confetti({particleCount:150,spread:90,origin:{y:0.6}});
+}
+function syncTimerDisplay(data){
+  if(data.state !== 'question') return;
+  if(state.isHost) document.getElementById('host-timer').innerText = data.timeLeft;
+  
+  const studentTimerEl = document.getElementById('student-timer');
+  if(studentTimerEl) studentTimerEl.innerText = data.timeLeft;
+
+  const studentWaitingTimerEl = document.getElementById('student-waiting-timer');
+  if(studentWaitingTimerEl) studentWaitingTimerEl.innerText = data.timeLeft;
+
+  if(data.timeLeft <= 5 && data.timeLeft > 0) playCountdownBeep();
+}
+
+function startLobbyTimer(){
+  state.lobbySeconds = 0;
+  clearInterval(state.lobbyTimerInterval);
+  state.lobbyTimerInterval = setInterval(() => {
+    state.lobbySeconds += 1;
+    const el = document.getElementById('student-lobby-timer');
+    if(el) el.innerText = state.lobbySeconds;
+  }, 1000);
+}
+
+async function studentJoinRoom(){
+  const pin = document.getElementById('student-pin-input').value.trim();
+  const nickname = document.getElementById('student-nickname-input').value.trim();
+  if(!pin || !nickname) return;
+
+  const roomSnap = await get(ref(db, `rooms/${pin}`));
+  if(!roomSnap.exists()) return;
+
+  const newPlayerRef = push(ref(db, `rooms/${pin}/players`));
+  const pid = newPlayerRef.key;
+  await set(newPlayerRef, { nickname, avatar: state.selectedAvatar, score: 0 });
+  onDisconnect(newPlayerRef).remove();
+
+  state.pin = pin; state.playerId = pid; state.nickname = nickname; state.hasJoined = true;
+  document.getElementById('student-my-nickname').innerText = nickname;
+  document.getElementById('student-lobby-avatar').innerText = state.selectedAvatar;
+
+  goTo('screen-student-lobby');
+  startLobbyTimer();
+  subscribeRoom(pin);
+  playClick();
+}
+window.studentJoinRoom = studentJoinRoom;
+
+async function studentSubmitAnswer(choiceIdx){
+  if(state._hasSubmittedCurrent) return;
+  const data=state.roomData, me=data?.players?.[state.playerId], shared=data?.gameMode==='team'&&data?.teamScoringMode==='shared';
+  if(shared&&me?.teamId){
+    const result=await runTransaction(ref(db,`rooms/${state.pin}/teamAnswers/${state.currentIndex}/${me.teamId}`),cur=>cur!==null?undefined:{choice:choiceIdx,timeLeft:data.timeLeft||0,submittedBy:state.playerId,submittedNickname:state.nickname||me.nickname||''});
+    if(!result.committed){ state._hasSubmittedCurrent=true; goTo('screen-student-waiting'); return; }
+  } else await set(ref(db,`rooms/${state.pin}/players/${state.playerId}/answers/${state.currentIndex}`),{choice:choiceIdx,timeLeft:data.timeLeft||0});
+  state._hasSubmittedCurrent=true; const wm=document.getElementById('student-waiting-message'); if(wm&&shared) wm.innerText='우리 팀의 답변이 제출되었습니다. 다른 팀의 답을 기다리는 중이에요...'; goTo('screen-student-waiting'); playClick();
+}
+
+window.studentSubmitAnswer = studentSubmitAnswer;
+
+async function studentSubmitSubjective(){
+  if(state._hasSubmittedCurrent) return;
+  const text=document.getElementById('student-subjective-input').value.trim(); if(!text) return;
+  const data=state.roomData, me=data?.players?.[state.playerId], shared=data?.gameMode==='team'&&data?.teamScoringMode==='shared';
+  if(shared&&me?.teamId){
+    const result=await runTransaction(ref(db,`rooms/${state.pin}/teamAnswers/${state.currentIndex}/${me.teamId}`),cur=>cur!==null?undefined:{text,timeLeft:data.timeLeft||0,submittedBy:state.playerId,submittedNickname:state.nickname||me.nickname||''});
+    if(!result.committed){ state._hasSubmittedCurrent=true; goTo('screen-student-waiting'); return; }
+  } else await set(ref(db,`rooms/${state.pin}/players/${state.playerId}/answers/${state.currentIndex}`),{text,timeLeft:data.timeLeft||0});
+  document.getElementById('student-subjective-input').value=''; state._hasSubmittedCurrent=true; const wm=document.getElementById('student-waiting-message'); if(wm&&shared) wm.innerText='우리 팀의 답변이 제출되었습니다. 다른 팀의 답을 기다리는 중이에요...'; goTo('screen-student-waiting'); playClick();
+}
+
+window.studentSubmitSubjective = studentSubmitSubjective;
+
+function renderAvatarPicker(){
+  const wrap = document.getElementById('avatar-picker'); wrap.innerHTML = '';
+  AVATAR_LIST.forEach(avatar => {
+    const btn = document.createElement('div');
+    btn.className = 'glass rounded-2xl py-2 text-2xl text-center cursor-pointer font-bold' + (avatar === state.selectedAvatar ? ' ring-4 ring-[var(--pastel-purple)]' : '');
+    btn.innerText = avatar;
+    btn.onclick = () => { state.selectedAvatar = avatar; renderAvatarPicker(); playClick(); };
+    wrap.appendChild(btn);
+  });
+}
+
+let teacherAuthMode = 'login';
+
+function togglePasswordVisibility(inputId, button){
+  const input = document.getElementById(inputId);
+  const icon = button?.querySelector('i');
+  if(!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+  if(icon){
+    icon.classList.toggle('fa-eye', input.type === 'password');
+    icon.classList.toggle('fa-eye-slash', input.type === 'text');
+  }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
+
+function checkTeacherPasswordMatch(){
+  const password = document.getElementById('teacher-password-input')?.value || '';
+  const confirm = document.getElementById('teacher-password-confirm-input')?.value || '';
+  const msg = document.getElementById('teacher-password-match');
+  if(!msg) return true;
+  if(!confirm){
+    msg.classList.add('hidden');
+    return true;
+  }
+  msg.classList.remove('hidden');
+  if(password === confirm){
+    msg.innerText = '✓ 비밀번호가 일치합니다.';
+    msg.className = 'text-xs font-bold mt-2 text-emerald-600';
+    return true;
+  }
+  msg.innerText = '✕ 비밀번호가 일치하지 않습니다.';
+  msg.className = 'text-xs font-bold mt-2 text-rose-500';
+  return false;
+}
+
+
+function showTeacherAuthError(message){
+  const el = document.getElementById('teacher-auth-error');
+  if(el){ el.innerText = message; el.classList.remove('hidden'); }
+}
+function clearTeacherAuthError(){
+  const el = document.getElementById('teacher-auth-error');
+  if(el){ el.innerText = ''; el.classList.add('hidden'); }
+}
+function setTeacherAuthMode(mode){
+  teacherAuthMode = mode;
+  const signup = mode === 'signup';
+  document.getElementById('teacher-auth-title').innerText = signup ? '선생님 회원가입' : '선생님 로그인';
+  document.getElementById('teacher-auth-submit').innerText = signup ? '회원가입' : '로그인';
+  document.getElementById('teacher-name-wrap').classList.toggle('hidden', !signup);
+  document.getElementById('teacher-password-confirm-wrap').classList.toggle('hidden', !signup);
+  const confirmInput = document.getElementById('teacher-password-confirm-input');
+  if(confirmInput){
+    confirmInput.value = '';
+    confirmInput.type = 'password';
+  }
+  const passwordInput = document.getElementById('teacher-password-input');
+  if(passwordInput) passwordInput.type = 'password';
+  document.getElementById('teacher-auth-toggle').innerText =
+    signup ? '이미 계정이 있나요? 로그인' : '처음이신가요? 회원가입';
+  checkTeacherPasswordMatch();
+  document.getElementById('teacher-password-input').autocomplete = signup ? 'new-password' : 'current-password';
+  clearTeacherAuthError();
+}
+function toggleTeacherAuthMode(){
+  setTeacherAuthMode(teacherAuthMode === 'login' ? 'signup' : 'login');
+  playClick();
+}
+window.toggleTeacherAuthMode = toggleTeacherAuthMode;
+
+function openTeacherEntry(){
+  if(auth.currentUser){
+    state.isHost = true;
+    state.ownerId = auth.currentUser.uid;
+    document.getElementById('teacher-account-label').innerText =
+      auth.currentUser.displayName || auth.currentUser.email || '선생님';
+    subscribeQuizBank();
+    goTo('screen-host-home');
+  }else{
+    setTeacherAuthMode('login');
+    goTo('screen-teacher-auth');
+  }
+}
+window.openTeacherEntry = openTeacherEntry;
+
+async function submitTeacherAuth(){
+  clearTeacherAuthError();
+  const email = document.getElementById('teacher-email-input').value.trim();
+  const password = document.getElementById('teacher-password-input').value;
+  const passwordConfirm = document.getElementById('teacher-password-confirm-input')?.value || '';
+  const name = document.getElementById('teacher-name-input').value.trim();
+
+  if(!email){ showTeacherAuthError('이메일을 입력해주세요.'); return; }
+  if(password.length < 6){ showTeacherAuthError('비밀번호는 6자 이상이어야 합니다.'); return; }
+  if(teacherAuthMode === 'signup' && !name){ showTeacherAuthError('선생님 이름을 입력해주세요.'); return; }
+  if(teacherAuthMode === 'signup' && password !== passwordConfirm){
+    showTeacherAuthError('비밀번호가 서로 일치하지 않습니다.');
+    checkTeacherPasswordMatch();
+    return;
+  }
+
+  const btn = document.getElementById('teacher-auth-submit');
+  const original = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = teacherAuthMode === 'signup' ? '가입 중...' : '로그인 중...';
+
+  try{
+    if(teacherAuthMode === 'signup'){
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      if(name) await updateProfile(credential.user, { displayName: name });
+      alert('회원가입이 완료되었습니다!');
+    }else{
+      await signInWithEmailAndPassword(auth, email, password);
+    }
+    state.isHost = true;
+    state.ownerId = auth.currentUser.uid;
+    document.getElementById('teacher-account-label').innerText =
+      auth.currentUser.displayName || auth.currentUser.email || '선생님';
+    subscribeQuizBank();
+    goTo('screen-host-home');
+  }catch(err){
+    console.error('선생님 인증 오류:', err);
+    const messages = {
+      'auth/invalid-email': '이메일 형식이 올바르지 않습니다.',
+      'auth/email-already-in-use': '이미 가입된 이메일입니다. 로그인해 주세요.',
+      'auth/weak-password': '비밀번호는 6자 이상이어야 합니다.',
+      'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않습니다.',
+      'auth/user-not-found': '가입된 계정을 찾을 수 없습니다.',
+      'auth/wrong-password': '이메일 또는 비밀번호가 올바르지 않습니다.',
+      'auth/too-many-requests': '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
+      'auth/network-request-failed': '인터넷 연결을 확인해주세요.',
+      'auth/operation-not-allowed': 'Firebase에서 이메일/비밀번호 로그인이 아직 활성화되지 않았습니다. Firebase Console → Authentication → Sign-in method에서 Email/Password를 켜주세요.',
+      'auth/configuration-not-found': 'Firebase Authentication 설정을 찾을 수 없습니다. Firebase Console에서 Authentication을 먼저 설정해주세요.',
+      'auth/unauthorized-domain': '현재 사이트 도메인이 Firebase Authentication의 승인된 도메인에 없습니다. Firebase Console → Authentication → Settings → Authorized domains에 현재 Netlify 도메인을 추가해주세요.',
+      'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'Firebase API 키 설정을 확인해주세요.',
+      'auth/invalid-api-key': 'Firebase API 키가 올바르지 않습니다. Firebase 프로젝트 설정의 웹 앱 설정을 확인해주세요.'
+    };
+    showTeacherAuthError(
+      (messages[err?.code] || '인증에 실패했습니다. Firebase 설정을 확인해주세요.') +
+      ` (오류 코드: ${err?.code || 'unknown'})`
+    );
+  }finally{
+    btn.disabled = false;
+    btn.innerText = original;
+  }
+}
+window.submitTeacherAuth = submitTeacherAuth;
+
+async function teacherLogout(){
+  try{
+    await signOut(auth);
+    state.isHost = false;
+    state.pin = null;
+    state.quiz = null;
+    state.ownerId = state.legacyOwnerId || state.ownerId;
+    state.quizBankCache = {};
+    if(quizBankUnsubscribe){ quizBankUnsubscribe(); quizBankUnsubscribe = null; }
+    goTo('screen-landing');
+    playClick();
+  }catch(err){
+    console.error('로그아웃 오류:', err);
+    alert('로그아웃에 실패했습니다.');
+  }
+}
+window.teacherLogout = teacherLogout;
+
+onAuthStateChanged(auth, (user) => {
+  if(user){
+    state.isHost = true;
+    state.ownerId = user.uid;
+    const label = document.getElementById('teacher-account-label');
+    if(label) label.innerText = user.displayName || user.email || '선생님';
+    subscribeQuizBank();
+  }else{
+    state.isHost = false;
+    state.quizBankCache = {};
+    if(document.getElementById('quiz-bank-list')) renderQuizBank();
+    if(quizBankUnsubscribe){ quizBankUnsubscribe(); quizBankUnsubscribe = null; }
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('teacher-password-input')?.addEventListener('input', checkTeacherPasswordMatch);
+  document.getElementById('teacher-password-confirm-input')?.addEventListener('input', checkTeacherPasswordMatch);
+
+  renderDraftList();
+  renderAvatarPicker();
+  setTeacherAuthMode('login');
+});
+</script>
+</body>
+</html>
