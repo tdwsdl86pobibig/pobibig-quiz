@@ -1970,5 +1970,63 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
+
+<script>
+/* TEAM UI FIX: put the team controls INSIDE the teacher waiting-room screen. */
+document.addEventListener('DOMContentLoaded', function () {
+  const lobby = document.getElementById('screen-host-lobby');
+  const panel = document.getElementById('team-system-panel');
+  if (!lobby || !panel || document.getElementById('teacher-team-settings')) return;
+
+  const box = document.createElement('div');
+  box.id = 'teacher-team-settings';
+  box.style.cssText =
+    'margin-top:18px;padding:16px;border-radius:18px;' +
+    'background:rgba(255,255,255,.92);border:2px solid rgba(120,100,160,.18);';
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:20px;font-weight:900">👥 팀전 설정</div>
+        <div style="font-size:13px;color:#777;margin-top:3px">게임 시작 전에 팀을 설정하세요. 최대 20팀</div>
+      </div>
+      <button id="open-team-settings" type="button"
+        style="padding:10px 15px;border:0;border-radius:12px;font-weight:900;cursor:pointer">
+        팀전 설정 열기
+      </button>
+    </div>
+    <div id="team-settings-inline" style="display:none;margin-top:14px"></div>
+  `;
+
+  const inline = box.querySelector('#team-settings-inline');
+  const open = box.querySelector('#open-team-settings');
+
+  // Move the already-built team panel into this teacher-only waiting-room area.
+  inline.appendChild(panel);
+  panel.style.display = 'none';
+  panel.style.marginTop = '12px';
+
+  open.addEventListener('click', function () {
+    const showing = panel.style.display !== 'none';
+    panel.style.display = showing ? 'none' : 'block';
+    open.textContent = showing ? '팀전 설정 열기' : '팀전 설정 닫기';
+    inline.style.display = showing ? 'none' : 'block';
+
+    if (!showing && window.TeamSystem) {
+      window.TeamSystem.init();
+    }
+  });
+
+  lobby.appendChild(box);
+
+  // Expose a simple teacher API for the existing game code.
+  window.TeacherTeamSettings = {
+    open: () => open.click(),
+    isEnabled: () => !!window.TeamSystem?.state?.enabled,
+    getConfig: () => window.TeamSystem?.getConfig?.() || null
+  };
+});
+</script>
+
 </body>
 </html>
