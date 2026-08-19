@@ -658,7 +658,31 @@ function playWrong(){ playTone(220,0.12,'sawtooth',0.15); playTone(174.61,0.2,'s
 function playTimeUp(){ playTone(311.13, 0.15, 'triangle', 0.15); playTone(155.56, 0.25, 'triangle', 0.15, 0.12); }
 function playRoundStart(){ playTone(523.25,0.08,'sine',0.12); playTone(659.25,0.08,'sine',0.12,0.06); playTone(783.99,0.15,'sine',0.15,0.12); }
 
+/* 상황별 효과음 추가 (UI 액션마다 다른 느낌을 주기 위한 팔레트) */
+function playPop(){ playTone(700, 0.06, 'sine', 0.12); }
+function playAdd(){ playTone(587.33,0.07,'triangle',0.14); playTone(880,0.09,'triangle',0.14,0.06); }
+function playSave(){ playTone(523.25,0.08,'sine',0.15); playTone(659.25,0.08,'sine',0.15,0.08); playTone(880,0.14,'sine',0.15,0.16); }
+function playDelete(){ playTone(392,0.08,'sawtooth',0.13); playTone(293.66,0.14,'sawtooth',0.13,0.08); }
+function playMove(){ playTone(988,0.05,'square',0.1); }
+function playError(){ playTone(233.08,0.1,'square',0.12); playTone(196,0.16,'square',0.12,0.09); }
+function playJoin(){ playTone(659.25,0.09,'sine',0.15); playTone(880,0.09,'sine',0.15,0.08); playTone(1046.5,0.14,'sine',0.15,0.16); }
+function playSubmit(){ playTone(784,0.07,'triangle',0.14); playTone(1046.5,0.1,'triangle',0.14,0.07); }
+function playWhoosh(){ playTone(300,0.18,'sine',0.08); playTone(150,0.22,'sine',0.07,0.05); }
+function playReveal(){ playTone(440,0.08,'triangle',0.12); playTone(659.25,0.1,'triangle',0.14,0.07); }
+function playFanfare(){ [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=>playTone(f,0.22,'triangle',0.16,i*0.12)); }
+
 window.playClick = playClick;
+window.playPop = playPop;
+window.playAdd = playAdd;
+window.playSave = playSave;
+window.playDelete = playDelete;
+window.playMove = playMove;
+window.playError = playError;
+window.playJoin = playJoin;
+window.playSubmit = playSubmit;
+window.playWhoosh = playWhoosh;
+window.playReveal = playReveal;
+window.playFanfare = playFanfare;
 
 /* 응답자 명단 팝업 처리 */
 function showVotersForChoice(choiceIdx){
@@ -697,7 +721,7 @@ function showVotersForChoice(choiceIdx){
   }
 
   modal.classList.remove('hidden');
-  playClick();
+  playPop();
 }
 window.showVotersForChoice = showVotersForChoice;
 
@@ -807,7 +831,7 @@ function addQuestionToDraft(){
   const duration = parseInt(document.getElementById('q-duration-input').value, 10) || 30;
   const videoUrl = document.getElementById('q-video-input').value.trim();
 
-  if(!text){ alert('질문을 입력해주세요.'); return; }
+  if(!text){ playError(); alert('질문을 입력해주세요.'); return; }
 
   let question = { type, text, duration };
   if(passage) question.passage = passage;
@@ -819,7 +843,7 @@ function addQuestionToDraft(){
     const c1 = document.getElementById('q-choice-1').value.trim();
     const c2 = document.getElementById('q-choice-2').value.trim();
     const c3 = document.getElementById('q-choice-3').value.trim();
-    if(!c0 || !c1 || !c2 || !c3){ alert('4개 보기를 모두 입력해주세요.'); return; }
+    if(!c0 || !c1 || !c2 || !c3){ playError(); alert('4개 보기를 모두 입력해주세요.'); return; }
     question.choices = [c0, c1, c2, c3];
     question.correctIndex = parseInt(document.getElementById('q-correct-select').value, 10);
   } else if(type === 'ox'){
@@ -827,14 +851,15 @@ function addQuestionToDraft(){
     question.correctIndex = parseInt(document.getElementById('q-correct-select').value, 10);
   } else if(type === 'subjective'){
     const rawAnswer = document.getElementById('q-subjective-answer').value.trim();
-    if(!rawAnswer){ alert('모범 답안 및 유사 답안을 입력해주세요.'); return; }
+    if(!rawAnswer){ playError(); alert('모범 답안 및 유사 답안을 입력해주세요.'); return; }
     
     const answersArray = rawAnswer.split(',').map(a => a.trim().toLowerCase()).filter(a => a.length > 0);
     question.subjectiveAnswer = rawAnswer;
     question.subjectiveAnswers = answersArray;
   }
 
-  if(state.editingQuestionIndex !== null){
+  const wasEditing = state.editingQuestionIndex !== null;
+  if(wasEditing){
     // 문제 목록에서 특정 문제를 "수정" 버튼으로 불러온 경우: 새로 추가하지 않고 해당 위치를 교체
     state.draftQuestions[state.editingQuestionIndex] = question;
     state.editingQuestionIndex = null;
@@ -846,7 +871,7 @@ function addQuestionToDraft(){
 
   resetQuestionForm();
   renderDraftList();
-  playClick();
+  wasEditing ? playSave() : playAdd();
 }
 window.addQuestionToDraft = addQuestionToDraft;
 
@@ -892,7 +917,7 @@ function editDraftQuestion(index){
   document.getElementById('cancel-question-edit-btn').classList.remove('hidden');
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  playClick();
+  playPop();
 }
 window.editDraftQuestion = editDraftQuestion;
 
@@ -918,7 +943,7 @@ function moveDraftQuestion(index, direction){
   else if(state.editingQuestionIndex === newIndex) state.editingQuestionIndex = index;
 
   renderDraftList();
-  playClick();
+  playMove();
 }
 window.moveDraftQuestion = moveDraftQuestion;
 
@@ -978,7 +1003,7 @@ function escapeHtml(str){ const d = document.createElement('div'); d.innerText =
 
 async function saveDraftQuiz(){
   const title = document.getElementById('quiz-title-input').value.trim() || '퀴즈 문제집';
-  if(state.draftQuestions.length === 0){ alert('최소 1개 이상 문제를 등록하세요.'); return; }
+  if(state.draftQuestions.length === 0){ playError(); alert('최소 1개 이상 문제를 등록하세요.'); return; }
 
   if(state.editingQuizId) {
     // 기존 퀴즈 세트 수정 업데이트
@@ -993,7 +1018,7 @@ async function saveDraftQuiz(){
   }
 
   cancelQuizEdit();
-  playClick();
+  playSave();
 }
 window.saveDraftQuiz = saveDraftQuiz;
 
@@ -1014,7 +1039,7 @@ function editQuizSet(quizId) {
 
   renderDraftList();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  playClick();
+  playPop();
 }
 window.editQuizSet = editQuizSet;
 
@@ -1039,7 +1064,7 @@ async function deleteQuizSet(quizId) {
     if(state.editingQuizId === quizId) {
       cancelQuizEdit();
     }
-    playClick();
+    playDelete();
   }
 }
 window.deleteQuizSet = deleteQuizSet;
@@ -1107,7 +1132,7 @@ function renderQuizBank(){
 }
 
 async function createRoomWithQuiz(quiz){
-  if(!quiz){ alert('퀴즈 정보를 불러오지 못했습니다. 다시 시도해주세요.'); return; }
+  if(!quiz){ playError(); alert('퀴즈 정보를 불러오지 못했습니다. 다시 시도해주세요.'); return; }
   const pin = generatePIN();
   state.pin = pin; state.isHost = true; state.quiz = quiz; state.currentIndex = 0;
   state.lastMediaKey = null;
@@ -1118,8 +1143,10 @@ async function createRoomWithQuiz(quiz){
     document.getElementById('lobby-pin').innerText = pin;
     goTo('screen-host-lobby');
     subscribeRoom(pin);
+    playSave();
   }catch(err){
     console.error('방 생성 실패:', err);
+    playError();
     alert('방 생성에 실패했습니다. 인터넷 연결 및 Firebase 설정을 확인해주세요.');
   }
 }
@@ -1186,6 +1213,16 @@ function renderLobbyPlayers(players){
     card.innerHTML = `<div class="text-2xl mb-1">${p.avatar}</div><div>${escapeHtml(p.nickname)}</div>`;
     grid.appendChild(card);
   });
+
+  // [버그 수정] 팀전 설정 패널(TeamSystem)은 window.teamPlayers를 통해 학생 명단을 받아
+  // "학생 팀 배정" 목록을 그리는데, 이 명단을 채워주는 TeamSystem.setPlayers(...) 호출이
+  // 코드 어디에도 없었습니다. 그래서 학생이 로비에 접속해도(메인 화면에는 잘 보였지만)
+  // 팀 배정 패널에는 영원히 "배정된 학생 없음"만 표시되고 있었습니다.
+  // 학생 명단이 갱신될 때마다(=매번 이 함수가 호출될 때마다) TeamSystem에도 최신 명단을
+  // 전달해서 팀 배정 목록이 실시간으로 함께 갱신되도록 연결합니다.
+  if(window.TeamSystem && typeof window.TeamSystem.setPlayers === 'function'){
+    window.TeamSystem.setPlayers(ids.map(pid => ({ ...players[pid], id: pid })));
+  }
 }
 
 function startCountdownAndStartGame() {
@@ -1427,6 +1464,10 @@ function renderRevealScreen(data){
 
   if(state.isHost){
     goTo('screen-host-reveal');
+    if(state._lastRevealKey !== idx){
+      state._lastRevealKey = idx;
+      playReveal();
+    }
     document.getElementById('reveal-question-text').innerText = q.text;
     const graphWrap = document.getElementById('reveal-graph-wrap');
     const subjWrap = document.getElementById('reveal-subjective-wrap');
@@ -1481,10 +1522,13 @@ function renderRevealScreen(data){
       const score = document.getElementById('student-result-score');
 
       if(me.lastCorrect){
-        icon.innerText = '✅'; text.innerText = '정답입니다!'; playCorrect();
+        icon.innerText = '✅'; text.innerText = '정답입니다!';
+        if(state._lastResultKey !== idx){ playCorrect(); }
       } else {
-        icon.innerText = '❌'; text.innerText = '오답입니다!'; playWrong();
+        icon.innerText = '❌'; text.innerText = '오답입니다!';
+        if(state._lastResultKey !== idx){ playWrong(); }
       }
+      state._lastResultKey = idx;
       score.innerText = `+${me.lastGain||0}점 (총 ${me.score||0}점)`;
     }
   }
@@ -1492,6 +1536,10 @@ function renderRevealScreen(data){
 
 function renderLeaderboardScreen(data){
   goTo('screen-leaderboard');
+  if(state._lastLeaderboardKey !== data.currentIndex){
+    state._lastLeaderboardKey = data.currentIndex;
+    playWhoosh();
+  }
   const ranked = Object.entries(data.players||{}).map(([pid,p])=>({pid, ...p})).sort((a,b)=>b.score-a.score);
   const list = document.getElementById('leaderboard-list'); list.innerHTML = '';
   ranked.forEach((p, i) => {
@@ -1506,6 +1554,10 @@ function renderLeaderboardScreen(data){
 
 function renderPodiumScreen(data){
   goTo('screen-podium');
+  if(!state._podiumSoundPlayed){
+    state._podiumSoundPlayed = true;
+    playFanfare();
+  }
   const ranked = Object.entries(data.players||{}).map(([pid,p])=>({pid, ...p})).sort((a,b)=>b.score-a.score);
 
   [1, 2, 3].forEach((rank, i) => {
@@ -1585,7 +1637,7 @@ async function studentJoinRoom(){
   goTo('screen-student-lobby');
   startLobbyTimer();
   subscribeRoom(pin);
-  playClick();
+  playJoin();
 }
 window.studentJoinRoom = studentJoinRoom;
 
@@ -1596,7 +1648,7 @@ async function studentSubmitAnswer(choiceIdx){
     choice: choiceIdx, timeLeft: state.roomData.timeLeft || 0
   });
   goTo('screen-student-waiting');
-  playClick();
+  playSubmit();
 }
 window.studentSubmitAnswer = studentSubmitAnswer;
 
@@ -1610,7 +1662,7 @@ async function studentSubmitSubjective(){
   });
   document.getElementById('student-subjective-input').value = '';
   goTo('screen-student-waiting');
-  playClick();
+  playSubmit();
 }
 window.studentSubmitSubjective = studentSubmitSubjective;
 
@@ -1620,7 +1672,7 @@ function renderAvatarPicker(){
     const btn = document.createElement('div');
     btn.className = 'glass rounded-2xl py-2 text-2xl text-center cursor-pointer font-bold' + (avatar === state.selectedAvatar ? ' ring-4 ring-[var(--pastel-purple)]' : '');
     btn.innerText = avatar;
-    btn.onclick = () => { state.selectedAvatar = avatar; renderAvatarPicker(); playClick(); };
+    btn.onclick = () => { state.selectedAvatar = avatar; renderAvatarPicker(); playPop(); };
     wrap.appendChild(btn);
   });
 }
@@ -1635,12 +1687,84 @@ document.addEventListener('DOMContentLoaded', () => {
 <!-- TEAM SYSTEM v1: up to 20 teams, teacher assignment, colors, team scoring -->
 <style>
 #team-system-panel{display:none}
+#team-system-panel{
+  font-family:'Rubik','Pretendard', sans-serif;
+  color: var(--ink);
+}
+#team-system-panel h2, #team-system-panel h3{
+  font-family:'Baloo 2', sans-serif;
+}
 .team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-.team-card{border:2px solid #ddd;border-radius:16px;padding:14px;background:#fff}
-.team-member{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;background:#fafafa;margin-top:6px}
-.team-dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto}
-.team-score-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;background:#fff;margin:6px 0}
-.team-pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 10px;font-weight:800}
+.team-card{
+  border:1px solid rgba(255,255,255,0.9);
+  border-radius:1.6rem;
+  padding:14px;
+  background: rgba(255,255,255,0.78);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 28px rgba(190,160,210,0.22);
+}
+.team-member{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-radius:1rem;
+  background: rgba(180,150,200,0.12);
+  margin-top:6px;
+  font-weight:700;
+}
+.team-dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 3px rgba(255,255,255,0.6)}
+.team-score-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;border-radius:1.3rem;
+  background: rgba(255,255,255,0.78);
+  border:1px solid rgba(255,255,255,0.9);
+  box-shadow: 0 6px 16px rgba(190,160,210,0.18);
+  margin:6px 0;
+  font-weight:800;
+}
+.team-pill{
+  display:inline-flex;align-items:center;gap:7px;
+  border-radius:999px;padding:6px 12px;font-weight:800;font-size:0.85rem;
+}
+.team-name-input, .team-color-input{
+  border:2px solid rgba(200,180,220,0.5) !important;
+  border-radius:1rem !important;
+  background: rgba(255,255,255,0.9) !important;
+  color:#3f3350 !important;
+  font-weight:700;
+  padding:8px 12px;
+}
+.team-name-input:focus, .team-color-input:focus{ outline:none; border-color: var(--pastel-purple) !important; }
+.team-move-btn{
+  background: linear-gradient(90deg, var(--pastel-purple), var(--pastel-pink));
+  color:#fff; border:0; border-radius:999px;
+  padding:5px 12px; font-weight:800; font-size:0.75rem; cursor:pointer;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.08);
+  transition: transform .15s ease;
+}
+.team-move-btn:active{ transform: scale(0.94) translateY(2px); }
+.team-btn-primary{
+  background: linear-gradient(90deg, var(--pastel-pink), var(--pastel-purple));
+  color:#fff; border:0; border-radius:1.6rem;
+  padding:12px 18px; font-weight:800; cursor:pointer;
+  box-shadow: 0 8px 0 rgba(0,0,0,0.06), 0 10px 24px rgba(255,143,177,0.35);
+  transition: transform .15s ease;
+}
+.team-btn-primary:hover{ transform: translateY(-2px); }
+.team-btn-primary:active{ transform: scale(0.96) translateY(2px); }
+.team-btn-ghost{
+  background: rgba(255,255,255,0.78);
+  border:1px solid rgba(200,180,220,0.5);
+  color: var(--ink);
+  border-radius:1.6rem;
+  padding:12px 18px; font-weight:800; cursor:pointer;
+}
+#team-system-panel input[type="checkbox"]{
+  width:20px; height:20px; accent-color: var(--pastel-purple); vertical-align:middle; margin-left:8px;
+}
+#team-system-panel input[type="number"]{
+  border:2px solid rgba(200,180,220,0.5); border-radius:1rem;
+  padding:6px 10px; font-weight:800; width:80px; margin-left:8px;
+  background: rgba(255,255,255,0.9); color:#3f3350;
+}
 </style>
 
 <script>
@@ -1750,7 +1874,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span style="width:10px;height:10px;border-radius:50%;background:${esc(t.color)}"></span>
             <span style="flex:1">${esc(p.name || p.nickname || '학생')}</span>
             <button type="button" class="team-move-btn" data-player="${esc(p.id)}">이동</button>
-          </div>`).join('') : '<div style="margin-top:8px;color:#888">배정된 학생 없음</div>'}
+          </div>`).join('') : '<div style="margin-top:8px;color:rgba(91,75,106,0.45);font-weight:700;font-size:0.85rem">배정된 학생 없음</div>'}
       </div>`;
     }).join('');
 
@@ -1765,6 +1889,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(Number.isInteger(n) && n>=1 && n<=state.teams.length){
           state.assignments[id]=state.teams[n-1].id;
           renderTeamRoster();
+          if(typeof window.playPop === 'function') window.playPop();
         }
       });
     });
@@ -1826,23 +1951,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const panel=document.createElement('section');
     panel.id='team-system-panel';
     panel.innerHTML=`
-      <div style="padding:20px">
-        <h2>👥 팀전 설정</h2>
-        <p style="color:#777">개인전은 기존 방식 그대로 유지됩니다. 팀전을 켜면 학생을 팀에 배정하고 팀 점수를 함께 집계합니다.</p>
-        <label style="display:block;margin:10px 0">
-          팀전 사용
-          <input id="team-enabled" type="checkbox">
-        </label>
-        <label style="display:block;margin:10px 0">
-          팀 수
-          <input id="team-count" type="number" min="1" max="${TEAM_MAX}" value="2">
-        </label>
+      <div style="padding:4px 2px">
+        <h2 style="font-size:1.4rem;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span>👥</span><span>팀전 설정</span>
+        </h2>
+        <p style="color:rgba(91,75,106,0.65);font-size:0.85rem;font-weight:600;margin-bottom:14px">개인전은 기존 방식 그대로 유지됩니다. 팀전을 켜면 학생을 팀에 배정하고 팀 점수를 함께 집계합니다.</p>
+
+        <div class="team-card" style="margin-bottom:14px">
+          <label style="display:flex;align-items:center;justify-content:space-between;font-weight:800;margin:6px 0">
+            <span>🔛 팀전 사용</span>
+            <input id="team-enabled" type="checkbox">
+          </label>
+          <label style="display:flex;align-items:center;justify-content:space-between;font-weight:800;margin:6px 0">
+            <span>🔢 팀 수</span>
+            <input id="team-count" type="number" min="1" max="${TEAM_MAX}" value="2">
+          </label>
+        </div>
+
         <div id="team-editor-list" class="team-grid"></div>
-        <h3 style="margin-top:20px">학생 팀 배정</h3>
-        <div id="team-roster-list" class="team-grid"></div>
-        <div style="display:flex;gap:8px;margin-top:16px">
-          <button id="team-save-btn" type="button">팀 설정 저장</button>
-          <button id="team-score-btn" type="button">팀 점수 보기</button>
+
+        <h3 style="margin-top:22px;font-size:1.05rem;font-weight:800;display:flex;align-items:center;gap:6px">
+          <span>🧑‍🤝‍🧑</span><span>학생 팀 배정</span>
+        </h3>
+        <div id="team-roster-list" class="team-grid" style="margin-top:8px"></div>
+
+        <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+          <button id="team-save-btn" type="button" class="team-btn-primary">
+            <i class="fa-solid fa-floppy-disk" style="margin-right:6px"></i>팀 설정 저장
+          </button>
+          <button id="team-score-btn" type="button" class="team-btn-ghost">
+            <i class="fa-solid fa-ranking-star" style="margin-right:6px"></i>팀 점수 보기
+          </button>
         </div>
         <div id="team-score-list" style="margin-top:12px"></div>
       </div>`;
@@ -1851,12 +1990,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('team-enabled').addEventListener('change',e=>{
       state.enabled=e.target.checked;
       panel.style.display='block';
+      if(typeof window.playPop === 'function') window.playPop();
     });
     document.getElementById('team-count').addEventListener('change',e=>{
       normalizeTeams(e.target.value);
+      if(typeof window.playPop === 'function') window.playPop();
     });
     document.getElementById('team-save-btn').addEventListener('click',async()=>{
       await saveTeamConfig();
+      if(typeof window.playSave === 'function') window.playSave();
       alert('팀 설정이 저장되었습니다.');
     });
     document.getElementById('team-score-btn').addEventListener('click',renderTeamScores);
@@ -1956,20 +2098,12 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 
-<script>
-document.addEventListener('DOMContentLoaded',()=>{
-  const panel=document.getElementById('team-system-panel');
-  if(!panel || document.getElementById('team-mode-launcher')) return;
-  const btn=document.createElement('button');
-  btn.id='team-mode-launcher';
-  btn.type='button';
-  btn.textContent='👥 팀전 설정 (최대 20팀)';
-  btn.style.cssText='margin:10px 0;padding:10px 14px;border-radius:12px;border:0;cursor:pointer;font-weight:800;';
-  btn.onclick=()=>{panel.style.display=panel.style.display==='none'?'block':'none';};
-  panel.parentNode.insertBefore(btn,panel);
-});
-</script>
-
+<!-- [정리] 예전에 쓰던 "팀전 설정" 플로팅 버튼은 삭제했습니다.
+     이 버튼은 #app 밖(body 최상위)에 그대로 남아있어서 goTo()의 화면 전환 로직이
+     적용되지 않았고, 그 결과 랜딩 화면/학생 참가 화면 등 모든 화면 위에 계속
+     떠 있는 상태로 보였습니다. 바로 아래 "TEAM UI FIX" 스크립트가 교사 대기실
+     화면 안에 예쁘게 정리된 "팀전 설정 열기" 버튼을 이미 만들어주므로, 이 낡은
+     버튼은 더 이상 필요 없어 제거했습니다. -->
 
 <script>
 /* TEAM UI FIX: put the team controls INSIDE the teacher waiting-room screen. */
@@ -1980,18 +2114,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const box = document.createElement('div');
   box.id = 'teacher-team-settings';
+  box.className = 'glass';
   box.style.cssText =
-    'margin-top:18px;padding:16px;border-radius:18px;' +
-    'background:rgba(255,255,255,.92);border:2px solid rgba(120,100,160,.18);';
+    'margin-top:18px;padding:18px 20px;border-radius:1.9rem;width:100%;max-width:42rem;';
 
   box.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div>
-        <div style="font-size:20px;font-weight:900">👥 팀전 설정</div>
-        <div style="font-size:13px;color:#777;margin-top:3px">게임 시작 전에 팀을 설정하세요. 최대 20팀</div>
+        <div style="font-family:'Baloo 2',sans-serif;font-size:1.25rem;font-weight:800;display:flex;align-items:center;gap:6px">
+          <span>👥</span><span>팀전 설정</span>
+        </div>
+        <div style="font-size:0.8rem;color:rgba(91,75,106,0.6);font-weight:700;margin-top:3px">게임 시작 전에 팀을 설정하세요. 최대 20팀</div>
       </div>
-      <button id="open-team-settings" type="button"
-        style="padding:10px 15px;border:0;border-radius:12px;font-weight:900;cursor:pointer">
+      <button id="open-team-settings" type="button" class="team-btn-primary" style="padding:10px 18px;font-size:0.9rem">
         팀전 설정 열기
       </button>
     </div>
@@ -2011,6 +2146,7 @@ document.addEventListener('DOMContentLoaded', function () {
     panel.style.display = showing ? 'none' : 'block';
     open.textContent = showing ? '팀전 설정 열기' : '팀전 설정 닫기';
     inline.style.display = showing ? 'none' : 'block';
+    if (typeof window.playPop === 'function') window.playPop();
 
     if (!showing && window.TeamSystem) {
       window.TeamSystem.init();
