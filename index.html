@@ -1126,24 +1126,12 @@ async function createRoomWithQuiz(quiz){
 window.createRoomWithQuiz = createRoomWithQuiz;
 
 function subscribeRoom(pin){
-  // 방 전체 상태 구독
   onValue(ref(db, `rooms/${pin}`), (snapshot) => {
     const data = snapshot.val();
     if(!data) return;
     state.roomData = data;
     state.players = data.players || {};
     handleRoomUpdate(data);
-  });
-
-  // 참가자 목록은 별도로 직접 구독한다.
-  // 이렇게 하면 방 전체 데이터의 다른 변경과 관계없이
-  // 학생이 입장/퇴장할 때 선생님 화면의 참가자 목록이 즉시 갱신된다.
-  onValue(ref(db, `rooms/${pin}/players`), (snapshot) => {
-    const players = snapshot.val() || {};
-    state.players = players;
-    if(state.isHost){
-      renderLobbyPlayers(players);
-    }
   });
 }
 
@@ -1188,23 +1176,14 @@ function syncCountdownDisplay(val) {
 
 function renderLobbyPlayers(players){
   const grid = document.getElementById('lobby-player-grid');
-  const countEl = document.getElementById('lobby-player-count');
-  if(!grid || !countEl) return;
-
   grid.innerHTML = '';
-  const ids = Object.keys(players || {});
-  countEl.innerText = ids.length;
-
-  if(ids.length === 0){
-    grid.innerHTML = '<p class="col-span-full text-center text-white/40 font-bold py-4">아직 참가한 학생이 없습니다.</p>';
-    return;
-  }
-
+  const ids = Object.keys(players);
+  document.getElementById('lobby-player-count').innerText = ids.length;
   ids.forEach(pid => {
-    const p = players[pid] || {};
+    const p = players[pid];
     const card = document.createElement('div');
     card.className = 'player-card glass rounded-[1.6rem] px-2 py-3 text-center font-bold text-sm';
-    card.innerHTML = `<div class="text-2xl mb-1">${p.avatar || '👤'}</div><div>${escapeHtml(p.nickname || '이름 없음')}</div>`;
+    card.innerHTML = `<div class="text-2xl mb-1">${p.avatar}</div><div>${escapeHtml(p.nickname)}</div>`;
     grid.appendChild(card);
   });
 }
@@ -1596,14 +1575,8 @@ async function studentJoinRoom(){
 
   const newPlayerRef = push(ref(db, `rooms/${pin}/players`));
   const pid = newPlayerRef.key;
-  await set(newPlayerRef, {
-    nickname,
-    avatar: state.selectedAvatar,
-    score: 0,
-    joinedAt: Date.now()
-  });
-  // 브라우저가 연결을 잃으면 해당 참가자를 자동으로 제거한다.
-  await onDisconnect(newPlayerRef).remove();
+  await set(newPlayerRef, { nickname, avatar: state.selectedAvatar, score: 0 });
+  onDisconnect(newPlayerRef).remove();
 
   state.pin = pin; state.playerId = pid; state.nickname = nickname; state.hasJoined = true;
   document.getElementById('student-my-nickname').innerText = nickname;
@@ -1658,5 +1631,344 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAvatarPicker();
 });
 </script>
+
+<!-- TEAM SYSTEM v1: up to 20 teams, teacher assignment, colors, team scoring -->
+<style>
+#team-system-panel{display:none}
+.team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.team-card{border:2px solid #ddd;border-radius:16px;padding:14px;background:#fff}
+.team-member{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;background:#fafafa;margin-top:6px}
+.team-dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto}
+.team-score-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;background:#fff;margin:6px 0}
+.team-pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 10px;font-weight:800}
+</style>
+
+<script>
+(function(){
+  'use strict';
+
+  const TEAM_MAX = 20;
+  const TEAM_COLORS = [
+    '#ff6b8a','#ff9f43','#ffd166','#06d6a0','#4ecdc4',
+    '#45aaf2','#5f6caf','#9b59b6','#e056fd','#00b894',
+    '#0984e3','#6c5ce7','#fd79a8','#e17055','#2d98da',
+    '#20bf6b','#a55eea','#3867d6','#fa8231','#778ca3'
+  ];
+
+  const state = {
+    enabled:false,
+    teams:[],
+    assignments:{},
+    scores:{}
+  };
+
+  function getFirebaseRoot(){
+    return window.db || window.database || null;
+  }
+
+  function roomRef(){
+    const db = getFirebaseRoot();
+    const pin =
+      window.currentRoomPin ||
+      window.roomPin ||
+      window.currentPin ||
+      document.querySelector('[data-room-pin]')?.dataset.roomPin;
+    if(!db || !pin || !window.firebase || !firebase.database) return null;
+    return firebase.database().ref('rooms/' + pin);
+  }
+
+  function esc(v){
+    return String(v ?? '').replace(/[&<>"']/g, m => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+    }[m]));
+  }
+
+  function teamById(id){ return state.teams.find(t=>t.id===id); }
+
+  function normalizeTeams(count){
+    count = Math.max(1, Math.min(TEAM_MAX, Number(count)||1));
+    const old = state.teams.slice();
+    state.teams = Array.from({length:count}, (_,i)=>{
+      const t = old[i] || {};
+      return {
+        id:t.id || ('team_' + (i+1)),
+        name:t.name || ('제 ' + (i+1) + '팀'),
+        color:t.color || TEAM_COLORS[i % TEAM_COLORS.length],
+        score:Number(t.score)||0
+      };
+    });
+    state.teams.forEach(t => state.scores[t.id] = Number(t.score)||0);
+    renderTeamEditor();
+  }
+
+  function renderTeamEditor(){
+    const wrap = document.getElementById('team-editor-list');
+    if(!wrap) return;
+    wrap.innerHTML = state.teams.map((t,i)=>`
+      <div class="team-card">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <span class="team-dot" style="background:${esc(t.color)}"></span>
+          <strong>${esc(t.name)}</strong>
+        </div>
+        <input class="team-name-input" data-team="${esc(t.id)}"
+          value="${esc(t.name)}" placeholder="팀 이름" style="width:100%;margin-bottom:8px">
+        <input class="team-color-input" data-team="${esc(t.id)}"
+          type="color" value="${esc(t.color)}" style="width:100%;height:38px">
+      </div>`).join('');
+
+    wrap.querySelectorAll('.team-name-input').forEach(el=>{
+      el.addEventListener('input',()=>{
+        const t=teamById(el.dataset.team); if(t) t.name=el.value;
+        renderTeamRoster();
+      });
+    });
+    wrap.querySelectorAll('.team-color-input').forEach(el=>{
+      el.addEventListener('input',()=>{
+        const t=teamById(el.dataset.team); if(t) t.color=el.value;
+        renderTeamEditor(); renderTeamRoster();
+      });
+    });
+    renderTeamRoster();
+  }
+
+  function renderTeamRoster(){
+    const wrap=document.getElementById('team-roster-list');
+    if(!wrap) return;
+
+    const players=Object.values(window.teamPlayers || {});
+    wrap.innerHTML=state.teams.map(t=>{
+      const members=players.filter(p=>state.assignments[p.id]===t.id);
+      return `<div class="team-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="team-pill" style="background:${esc(t.color)}22;color:${esc(t.color)}">
+            <span class="team-dot" style="background:${esc(t.color)}"></span>${esc(t.name)}
+          </span>
+          <b>${members.length}명</b>
+        </div>
+        ${members.length ? members.map(p=>`
+          <div class="team-member">
+            <span style="width:10px;height:10px;border-radius:50%;background:${esc(t.color)}"></span>
+            <span style="flex:1">${esc(p.name || p.nickname || '학생')}</span>
+            <button type="button" class="team-move-btn" data-player="${esc(p.id)}">이동</button>
+          </div>`).join('') : '<div style="margin-top:8px;color:#888">배정된 학생 없음</div>'}
+      </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('.team-move-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const id=btn.dataset.player;
+        const next=prompt(
+          '이동할 팀 번호를 입력하세요.\\n' +
+          state.teams.map((t,i)=>(i+1)+'. '+t.name).join('\\n')
+        );
+        const n=Number(next);
+        if(Number.isInteger(n) && n>=1 && n<=state.teams.length){
+          state.assignments[id]=state.teams[n-1].id;
+          renderTeamRoster();
+        }
+      });
+    });
+  }
+
+  async function saveTeamConfig(){
+    const ref=roomRef();
+    const payload={
+      enabled:state.enabled,
+      maxTeams:TEAM_MAX,
+      teams:state.teams,
+      assignments:state.assignments
+    };
+    if(ref) await ref.child('teamConfig').set(payload);
+    return payload;
+  }
+
+  function loadTeamConfig(data){
+    if(!data) return;
+    state.enabled=!!data.enabled;
+    state.teams=Array.isArray(data.teams) ? data.teams : [];
+    state.assignments=data.assignments || {};
+    state.teams.forEach(t=>state.scores[t.id]=Number(t.score)||0);
+    renderTeamEditor();
+  }
+
+  function teamScoreForPlayer(playerId){
+    const id=state.assignments[playerId];
+    return id ? teamById(id) : null;
+  }
+
+  async function addTeamPoints(playerId, points){
+    if(!state.enabled) return;
+    const t=teamScoreForPlayer(playerId);
+    if(!t) return;
+    t.score=(Number(t.score)||0)+(Number(points)||0);
+    state.scores[t.id]=t.score;
+    const ref=roomRef();
+    if(ref) await ref.child('teamScores/'+t.id).set(t.score);
+    renderTeamScores();
+  }
+
+  function renderTeamScores(){
+    const wrap=document.getElementById('team-score-list');
+    if(!wrap) return;
+    wrap.innerHTML=state.teams
+      .slice().sort((a,b)=>(b.score||0)-(a.score||0))
+      .map((t,i)=>`<div class="team-score-row">
+        <span class="team-pill" style="background:${esc(t.color)}22;color:${esc(t.color)}">
+          <span class="team-dot" style="background:${esc(t.color)}"></span>
+          ${i+1}. ${esc(t.name)}
+        </span>
+        <strong>${Number(t.score)||0}점</strong>
+      </div>`).join('');
+  }
+
+  function buildPanel(){
+    if(document.getElementById('team-system-panel')) return;
+    const panel=document.createElement('section');
+    panel.id='team-system-panel';
+    panel.innerHTML=`
+      <div style="padding:20px">
+        <h2>👥 팀전 설정</h2>
+        <p style="color:#777">개인전은 기존 방식 그대로 유지됩니다. 팀전을 켜면 학생을 팀에 배정하고 팀 점수를 함께 집계합니다.</p>
+        <label style="display:block;margin:10px 0">
+          팀전 사용
+          <input id="team-enabled" type="checkbox">
+        </label>
+        <label style="display:block;margin:10px 0">
+          팀 수
+          <input id="team-count" type="number" min="1" max="${TEAM_MAX}" value="2">
+        </label>
+        <div id="team-editor-list" class="team-grid"></div>
+        <h3 style="margin-top:20px">학생 팀 배정</h3>
+        <div id="team-roster-list" class="team-grid"></div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button id="team-save-btn" type="button">팀 설정 저장</button>
+          <button id="team-score-btn" type="button">팀 점수 보기</button>
+        </div>
+        <div id="team-score-list" style="margin-top:12px"></div>
+      </div>`;
+    document.body.appendChild(panel);
+
+    document.getElementById('team-enabled').addEventListener('change',e=>{
+      state.enabled=e.target.checked;
+      panel.style.display='block';
+    });
+    document.getElementById('team-count').addEventListener('change',e=>{
+      normalizeTeams(e.target.value);
+    });
+    document.getElementById('team-save-btn').addEventListener('click',async()=>{
+      await saveTeamConfig();
+      alert('팀 설정이 저장되었습니다.');
+    });
+    document.getElementById('team-score-btn').addEventListener('click',renderTeamScores);
+    normalizeTeams(2);
+  }
+
+  // Public API for the existing game code.
+  window.TeamSystem={
+    maxTeams:TEAM_MAX,
+    state,
+    init:buildPanel,
+    setPlayers(players){
+      window.teamPlayers={};
+      (players||[]).forEach(p=>{
+        const id=p.id || p.uid || p.playerId || p.name;
+        window.teamPlayers[id]={...p,id};
+        if(!state.assignments[id] && state.teams[0]) state.assignments[id]=state.teams[0].id;
+      });
+      renderTeamRoster();
+    },
+    addPoints:addTeamPoints,
+    getTeam(playerId){ return teamScoreForPlayer(playerId); },
+    getConfig(){ return {
+      enabled:state.enabled,
+      teams:state.teams,
+      assignments:state.assignments,
+      maxTeams:TEAM_MAX
+    }; },
+    load:loadTeamConfig,
+    renderScores:renderTeamScores
+  };
+
+  // Create the module but don't force the UI over the existing app.
+  document.addEventListener('DOMContentLoaded',buildPanel);
+
+})();
+</script>
+
+
+<script>
+/* TEAM SYSTEM INTEGRATION BRIDGE
+   - Personal scores remain independent.
+   - A correct answer can add the same points to the student's team.
+   - Opinion/discussion questions can be recorded without requiring a correct answer.
+   - Final scoreboard can render both personal and team standings.
+*/
+(function(){
+  const TS = window.TeamSystem;
+  if(!TS) return;
+
+  const originalAddPoints = TS.addPoints;
+  TS.recordAnswer = async function(playerId, points, opts={}){
+    const p = Number(points)||0;
+    if(opts.personal !== false){
+      const fn = window.addPlayerScore || window.updatePlayerScore ||
+                 window.incrementPlayerScore;
+      if(typeof fn === 'function'){
+        try { await fn(playerId, p); } catch(e) { console.warn('personal score hook:',e); }
+      }
+    }
+    if(TS.state.enabled && opts.team !== false){
+      await originalAddPoints(playerId, p);
+    }
+    return {playerId, points:p, team:TS.getTeam(playerId)};
+  };
+
+  TS.recordOpinion = async function(playerId, text){
+    const refFn = window.roomRef || window.getRoomRef;
+    let ref = null;
+    try { if(typeof refFn === 'function') ref=refFn(); } catch(e){}
+    if(ref && ref.child){
+      await ref.child('opinions/'+playerId).push({
+        text:String(text||''),
+        at:Date.now()
+      });
+    }
+    return true;
+  };
+
+  TS.finalStandings = function(personalPlayers){
+    const personal=(personalPlayers||[]).slice().sort(
+      (a,b)=>(Number(b.score)||0)-(Number(a.score)||0)
+    );
+    const teams=TS.state.teams.slice().sort(
+      (a,b)=>(Number(b.score)||0)-(Number(a.score)||0)
+    );
+    return {personal, teams};
+  };
+
+  window.addTeamScoreForAnswer = function(playerId, points){
+    return TS.recordAnswer(playerId, points);
+  };
+  window.recordOpinionAnswer = function(playerId, text){
+    return TS.recordOpinion(playerId, text);
+  };
+})();
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const panel=document.getElementById('team-system-panel');
+  if(!panel || document.getElementById('team-mode-launcher')) return;
+  const btn=document.createElement('button');
+  btn.id='team-mode-launcher';
+  btn.type='button';
+  btn.textContent='👥 팀전 설정 (최대 20팀)';
+  btn.style.cssText='margin:10px 0;padding:10px 14px;border-radius:12px;border:0;cursor:pointer;font-weight:800;';
+  btn.onclick=()=>{panel.style.display=panel.style.display==='none'?'block':'none';};
+  panel.parentNode.insertBefore(btn,panel);
+});
+</script>
+
 </body>
 </html>
