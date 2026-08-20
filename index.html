@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <style>
   :root{
@@ -214,6 +215,9 @@
   </section>
 
   <section id="screen-teacher-auth" class="hidden w-full min-h-screen px-6 py-8 flex flex-col items-center justify-center">
+    <button onclick="goTo('screen-landing')" class="fixed top-3 left-3 z-40 glass rounded-full px-4 py-2 text-sm font-bold text-white/60 hover:text-white flex items-center gap-1.5">
+      <i class="fa-solid fa-arrow-left"></i> 뒤로가기
+    </button>
     <div class="w-full max-w-sm">
       <div class="text-center mb-7">
         <div class="text-5xl mb-3">👩‍🏫</div>
@@ -230,12 +234,24 @@
         <input id="teacher-email-input" type="email" autocomplete="email" placeholder="teacher@example.com"
                class="w-full rounded-2xl px-3 py-3 outline-none font-bold mb-3">
         <label class="text-xs font-bold text-white/70 mb-1 block">비밀번호</label>
-        <input id="teacher-password-input" type="password" autocomplete="current-password" placeholder="6자 이상"
-               class="w-full rounded-2xl px-3 py-3 outline-none font-bold mb-3">
+        <div class="relative mb-3">
+          <input id="teacher-password-input" type="password" autocomplete="current-password" placeholder="6자 이상"
+                 class="w-full rounded-2xl px-3 py-3 pr-11 outline-none font-bold">
+          <button type="button" onclick="togglePasswordVisibility('teacher-password-input', this)"
+                  class="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+        </div>
         <div id="teacher-password-confirm-wrap" class="hidden mb-3">
           <label class="text-xs font-bold text-white/70 mb-1 block">비밀번호 확인</label>
-          <input id="teacher-password-confirm-input" type="password" autocomplete="new-password" placeholder="비밀번호를 한 번 더 입력해주세요"
-                 class="w-full rounded-2xl px-3 py-3 outline-none font-bold">
+          <div class="relative">
+            <input id="teacher-password-confirm-input" type="password" autocomplete="new-password" placeholder="비밀번호를 한 번 더 입력해주세요"
+                   class="w-full rounded-2xl px-3 py-3 pr-11 outline-none font-bold">
+            <button type="button" onclick="togglePasswordVisibility('teacher-password-confirm-input', this)"
+                    class="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
         </div>
         <label class="flex items-center gap-2 mb-4 cursor-pointer select-none">
           <input id="teacher-remember-me-input" type="checkbox" checked
@@ -250,9 +266,6 @@
         <button id="teacher-auth-toggle" onclick="toggleTeacherAuthMode()"
                 class="w-full text-sm font-bold text-indigo-600 mt-4">
           처음이신가요? 회원가입
-        </button>
-        <button onclick="goTo('screen-landing')" class="w-full text-white/45 text-sm mt-5">
-          <i class="fa-solid fa-arrow-left mr-1"></i> 뒤로가기
         </button>
       </div>
     </div>
@@ -297,6 +310,11 @@
       </div>
 
       <textarea id="q-text-input" rows="2" placeholder="문제 질문을 입력하세요..." class="w-full rounded-2xl p-3 mb-3 text-sm outline-none"></textarea>
+
+      <div class="mb-3">
+        <label class="text-xs font-bold text-white/70 mb-1 block"><i class="fa-solid fa-lightbulb text-[var(--pastel-yellow)] mr-1"></i> 문제 해설 (정답 공개 화면에 표시)</label>
+        <textarea id="q-explanation-input" rows="3" placeholder="정답의 이유, 풀이 과정, 참고 내용을 입력하세요... (선택사항)" class="w-full rounded-2xl p-3 text-sm outline-none"></textarea>
+      </div>
 
       <div id="q-choices-container" class="mb-3">
         <div id="q-choices-4" class="grid grid-cols-1 gap-2">
@@ -381,7 +399,12 @@
     </button>
     <p class="text-white/50 mb-1 font-bold pt-6">참가 코드 (PIN)</p>
     <div id="lobby-pin" class="pin-digit text-6xl md:text-7xl font-extrabold neon-text mb-2">------</div>
-    <p class="text-white/40 text-sm mb-6"><i class="fa-solid fa-mobile-screen-button mr-1"></i>학생들에게 이 PIN을 알려주세요</p>
+    <p class="text-white/40 text-sm mb-4"><i class="fa-solid fa-mobile-screen-button mr-1"></i>학생들에게 이 PIN을 알려주세요</p>
+
+    <div class="glass rounded-[1.6rem] p-4 mb-6 flex flex-col items-center gap-2">
+      <div id="lobby-qrcode" class="bg-white p-2 rounded-xl"></div>
+      <p class="text-white/40 text-xs font-bold text-center"><i class="fa-solid fa-qrcode mr-1"></i>QR코드를 스캔하면 PIN 입력 없이 바로 참여할 수 있어요</p>
+    </div>
 
     <div class="glass rounded-[1.9rem] px-6 py-3 mb-6 flex items-center gap-3">
       <i class="fa-solid fa-users text-2xl text-[var(--pastel-blue)]"></i>
@@ -506,9 +529,35 @@
       <div id="subjective-answers-list" class="flex flex-col gap-2 max-h-60 overflow-y-auto"></div>
     </div>
 
-    <button onclick="hostShowLeaderboard()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
-      순위 확인하기 <i class="fa-solid fa-arrow-right ml-1"></i>
+    <button onclick="hostShowExplanation()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
+      문제 해설 보기 <i class="fa-solid fa-lightbulb ml-1"></i>
     </button>
+  </section>
+
+  <section id="screen-question-explanation" class="hidden w-full min-h-screen px-6 py-8 flex flex-col items-center justify-center text-center">
+    <div class="w-full max-w-2xl">
+      <div class="text-5xl mb-4">💡</div>
+      <h2 class="font-display text-3xl font-extrabold neon-text mb-2">문제 해설</h2>
+      <p id="explanation-question-text" class="text-slate-700 text-sm md:text-base font-extrabold mb-5 leading-relaxed"></p>
+
+      <div class="glass rounded-[1.9rem] p-6 text-left mb-6">
+        <h3 class="font-bold text-lg mb-3">
+          <i class="fa-solid fa-lightbulb text-[var(--pastel-yellow)] mr-1"></i>
+          해설
+        </h3>
+        <p id="explanation-text" class="whitespace-pre-wrap leading-relaxed font-medium text-sm md:text-base"></p>
+        <p id="explanation-empty" class="hidden text-white/45 text-sm text-center py-4">등록된 해설이 없습니다.</p>
+      </div>
+
+      <div id="host-explanation-controls">
+        <button onclick="hostShowLeaderboard()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
+          순위 확인하기 <i class="fa-solid fa-arrow-right ml-1"></i>
+        </button>
+      </div>
+      <p id="student-explanation-wait" class="hidden text-white/50 text-sm font-bold">
+        선생님이 다음 화면을 준비 중입니다...
+      </p>
+    </div>
   </section>
 
   <section id="screen-leaderboard" class="hidden w-full min-h-screen px-4 py-8 flex flex-col items-center">
@@ -783,8 +832,9 @@ const BGM_SCREEN_GROUP = {
   'screen-student-join': 'lobby',
   'screen-student-lobby': 'lobby',
   'screen-host-question': 'quiz',
-  'screen-host-reveal': 'quiz',
-  'screen-leaderboard': 'quiz',
+  'screen-host-reveal': 'silent',
+  'screen-question-explanation': 'silent',
+  'screen-leaderboard': 'silent',
   'screen-student-question': 'quiz',
   'screen-student-waiting': 'quiz',
   'screen-student-result': 'quiz',
@@ -803,6 +853,11 @@ function updateBgmForScreen(screenId){
   if(!player || !group) return;
   if(group === bgmCurrentGroup) return; // 같은 그룹이면 곡을 다시 시작하지 않고 그대로 이어서 재생
   bgmCurrentGroup = group;
+  if(group === 'silent'){
+    // [기능 추가] 결과 확인 · 문제 해설 · 실시간 순위 화면에서는 배경음악을 끕니다.
+    player.pause();
+    return;
+  }
   const src = BGM_TRACKS[group];
   if(player.getAttribute('data-track') !== src){
     player.src = src;
@@ -928,6 +983,32 @@ window.goTo = goTo;
 
 function generatePIN(){ return String(Math.floor(100000 + Math.random() * 900000)); }
 
+/* [기능 추가] 참여 QR코드: PIN이 미리 채워진 참여 링크를 QR코드로 만들어 보여줍니다.
+   학생이 폰 카메라로 스캔하면 이 링크(?pin=123456)로 접속하게 되고,
+   DOMContentLoaded 시점에 이 파라미터를 읽어 PIN 입력 없이 바로 참여 화면으로
+   이동시켜줍니다 (아래 studentJoinViaQrParam 참고). */
+function buildJoinUrl(pin){
+  const url = new URL(location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('pin', pin);
+  return url.toString();
+}
+function renderJoinQRCode(pin){
+  const container = document.getElementById('lobby-qrcode');
+  if(!container || typeof QRCode === 'undefined') return;
+  container.innerHTML = '';
+  new QRCode(container, {
+    text: buildJoinUrl(pin),
+    width: 140,
+    height: 140,
+    colorDark: '#3f3350',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+
 function handleQuestionTypeChange(){
   const type = document.getElementById('q-type-select').value;
   const passageWrap = document.getElementById('q-passage-wrap');
@@ -996,6 +1077,7 @@ function resetQuestionForm(){
   document.getElementById('q-type-select').value = 'choice';
   handleQuestionTypeChange();
   document.getElementById('q-text-input').value = '';
+  document.getElementById('q-explanation-input').value = '';
   document.getElementById('q-passage-input').value = '';
   document.getElementById('q-choice-0').value = '';
   document.getElementById('q-choice-1').value = '';
@@ -1011,12 +1093,14 @@ function addQuestionToDraft(){
   const type = document.getElementById('q-type-select').value;
   const passage = document.getElementById('q-passage-input').value.trim();
   const text = document.getElementById('q-text-input').value.trim();
+  const explanation = document.getElementById('q-explanation-input').value.trim();
   const duration = parseInt(document.getElementById('q-duration-input').value, 10) || 30;
   const videoUrl = document.getElementById('q-video-input').value.trim();
 
   if(!text){ playError(); alert('질문을 입력해주세요.'); return; }
 
   let question = { type, text, duration };
+  if(explanation) question.explanation = explanation;
   if(passage) question.passage = passage;
   if(state.draftImage) question.image = state.draftImage;
   if(videoUrl) question.videoUrl = videoUrl;
@@ -1068,6 +1152,7 @@ function editDraftQuestion(index){
   handleQuestionTypeChange();
 
   document.getElementById('q-text-input').value = q.text || '';
+  document.getElementById('q-explanation-input').value = q.explanation || '';
   document.getElementById('q-passage-input').value = q.passage || '';
   document.getElementById('q-duration-input').value = q.duration || 30;
 
@@ -1256,12 +1341,38 @@ async function deleteQuizSet(quizId) {
 window.deleteQuizSet = deleteQuizSet;
 
 let quizBankUnsubscribe = null;
+let quizBankRetryTimer = null;
 function subscribeQuizBank(){
   if(quizBankUnsubscribe) return;
-  quizBankUnsubscribe = onValue(ref(db, 'quizBank'), (snapshot) => {
-    state.quizBankCache = snapshot.val() || {};
-    renderQuizBank();
-  });
+  // 데이터가 아직 도착하지 않은 "로딩 중" 상태와 "저장된 퀴즈가 없음" 상태를
+  // 구분해서 보여주기 위해, 목록이 비어있을 때 우선 안내 문구를 띄워둡니다.
+  const wrap = document.getElementById('quiz-bank-list');
+  if(wrap && !wrap.innerHTML.trim()){
+    wrap.innerHTML = `<p class="text-center text-sm font-bold text-white/50 py-4">불러오는 중...</p>`;
+  }
+  quizBankUnsubscribe = onValue(
+    ref(db, 'quizBank'),
+    (snapshot) => {
+      state.quizBankCache = snapshot.val() || {};
+      renderQuizBank();
+    },
+    (error) => {
+      // [버그 수정] 새 기기에서 로그인하거나 재로그인한 직후에는, 로그인 자체는
+      // 성공했지만 실시간DB 연결이 새 인증 토큰을 아직 반영하지 못한 아주 짧은
+      // 순간이 있을 수 있습니다. 그 타이밍에 이 구독을 시도하면 일시적으로
+      // permission-denied 에러가 나는데, 에러 콜백이 없으면 Firebase가 리스너를
+      // 조용히 끊어버려서 "데이터는 분명히 있는데 화면에는 영원히 안 뜨는" 버그로
+      // 이어졌습니다. 여기서는 에러를 감지해 구독 상태를 초기화하고 잠시 후
+      // 자동으로 다시 구독을 시도합니다.
+      console.warn('문제 은행 구독 오류, 잠시 후 재시도합니다:', error);
+      quizBankUnsubscribe = null;
+      if(quizBankRetryTimer) clearTimeout(quizBankRetryTimer);
+      quizBankRetryTimer = setTimeout(() => {
+        quizBankRetryTimer = null;
+        if(state.ownerId) subscribeQuizBank();
+      }, 1000);
+    }
+  );
 }
 
 function renderQuizBank(){
@@ -1334,6 +1445,7 @@ async function createRoomWithQuiz(quiz){
       hostId: 'host_'+Date.now(), state: 'lobby', quiz, currentIndex: 0, timeLeft: 0, timerRunning: false, players: {}
     });
     document.getElementById('lobby-pin').innerText = pin;
+    renderJoinQRCode(pin);
     goTo('screen-host-lobby');
     subscribeRoom(pin);
     playSave();
@@ -1430,6 +1542,8 @@ function handleRoomUpdate(data){
     renderQuestionScreen(data);
   } else if(data.state === 'reveal'){
     renderRevealScreen(data);
+  } else if(data.state === 'explanation'){
+    renderExplanationScreen(data);
   } else if(data.state === 'leaderboard'){
     renderLeaderboardScreen(data);
   } else if(data.state === 'podium'){
@@ -1505,7 +1619,7 @@ function startCountdownAndStartGame() {
     }
   }
 
-  let count = 4;
+  let count = 7;
   const timer = setInterval(async () => {
     count--;
     if (count > 0) {
@@ -1605,6 +1719,11 @@ async function revealResults(){
   updates[`rooms/${state.pin}/state`] = 'reveal';
   await update(ref(db), updates);
 }
+
+async function hostShowExplanation(){
+  await update(ref(db, `rooms/${state.pin}`), { state: 'explanation' });
+}
+window.hostShowExplanation = hostShowExplanation;
 
 function hostShowLeaderboard(){ update(ref(db, `rooms/${state.pin}`), { state: 'leaderboard' }); }
 window.hostShowLeaderboard = hostShowLeaderboard;
@@ -1851,6 +1970,42 @@ function renderRevealScreen(data){
       }
       state._lastResultKey = idx;
     }
+  }
+}
+
+function renderExplanationScreen(data){
+  const idx = data.currentIndex;
+  const q = data.quiz.questions[idx];
+  const screen = document.getElementById('screen-question-explanation');
+  if(!screen) return;
+
+  goTo('screen-question-explanation');
+
+  document.getElementById('explanation-question-text').innerText =
+    q.text ? `문제 ${idx + 1} · ${q.text}` : `문제 ${idx + 1}`;
+
+  const textEl = document.getElementById('explanation-text');
+  const emptyEl = document.getElementById('explanation-empty');
+
+  if(q.explanation){
+    textEl.innerText = q.explanation;
+    textEl.classList.remove('hidden');
+    emptyEl.classList.add('hidden');
+  } else {
+    textEl.innerText = '';
+    textEl.classList.add('hidden');
+    emptyEl.classList.remove('hidden');
+  }
+
+  const hostControls = document.getElementById('host-explanation-controls');
+  const studentWait = document.getElementById('student-explanation-wait');
+
+  if(state.isHost){
+    hostControls.classList.remove('hidden');
+    studentWait.classList.add('hidden');
+  } else {
+    hostControls.classList.add('hidden');
+    studentWait.classList.remove('hidden');
   }
 }
 
@@ -2185,6 +2340,8 @@ function setTeacherAuthMode(mode){
   document.getElementById('teacher-auth-toggle').innerText =
     signup ? '이미 계정이 있나요? 로그인' : '처음이신가요? 회원가입';
   document.getElementById('teacher-password-input').autocomplete = signup ? 'new-password' : 'current-password';
+  resetPasswordVisibility('teacher-password-input');
+  resetPasswordVisibility('teacher-password-confirm-input');
   clearTeacherAuthError();
 }
 function toggleTeacherAuthMode(){
@@ -2192,6 +2349,33 @@ function toggleTeacherAuthMode(){
   playClick();
 }
 window.toggleTeacherAuthMode = toggleTeacherAuthMode;
+
+/* 비밀번호 입력란 옆 눈 모양 버튼: 누르면 입력값을 텍스트로 보여주고, 다시 누르면 가립니다. */
+function togglePasswordVisibility(inputId, btnEl){
+  const input = document.getElementById(inputId);
+  if(!input) return;
+  const icon = btnEl.querySelector('i');
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  if(icon){
+    icon.classList.toggle('fa-eye', showing);
+    icon.classList.toggle('fa-eye-slash', !showing);
+  }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
+
+/* 로그인/회원가입 모드를 전환할 때 비밀번호 표시 상태를 다시 가림 상태로 되돌립니다. */
+function resetPasswordVisibility(inputId){
+  const input = document.getElementById(inputId);
+  if(!input) return;
+  input.type = 'password';
+  const btn = input.parentElement && input.parentElement.querySelector('button i');
+  if(btn){
+    btn.classList.remove('fa-eye-slash');
+    btn.classList.add('fa-eye');
+  }
+}
+window.resetPasswordVisibility = resetPasswordVisibility;
 
 function loadRememberedTeacherEmail(){
   try{
@@ -2301,6 +2485,7 @@ async function teacherLogout(){
     state.quiz = null;
     state.quizBankCache = {};
     if(quizBankUnsubscribe){ quizBankUnsubscribe(); quizBankUnsubscribe = null; }
+    if(quizBankRetryTimer){ clearTimeout(quizBankRetryTimer); quizBankRetryTimer = null; }
     goTo('screen-landing');
     playClick();
   }catch(err){
@@ -2328,6 +2513,7 @@ onAuthStateChanged(auth, (user) => {
     state.quizBankCache = {};
     if(document.getElementById('quiz-bank-list')) renderQuizBank();
     if(quizBankUnsubscribe){ quizBankUnsubscribe(); quizBankUnsubscribe = null; }
+    if(quizBankRetryTimer){ clearTimeout(quizBankRetryTimer); quizBankRetryTimer = null; }
   }
 });
 
@@ -2335,7 +2521,17 @@ document.addEventListener('DOMContentLoaded', () => {
   renderDraftList();
   renderAvatarPicker();
   setTeacherAuthMode('login');
-  updateBgmForScreen('screen-landing');
+
+  // [기능 추가] QR코드로 만든 참여 링크(?pin=123456)로 접속한 경우, PIN을 직접
+  // 입력할 필요 없이 바로 학생 참여 화면으로 이동시키고 PIN을 미리 채워둡니다.
+  const qrPin = new URLSearchParams(location.search).get('pin');
+  if(qrPin && /^\d{6}$/.test(qrPin)){
+    document.getElementById('student-pin-input').value = qrPin;
+    goTo('screen-student-join');
+    document.getElementById('student-nickname-input').focus();
+  } else {
+    updateBgmForScreen('screen-landing');
+  }
 });
 </script>
 
