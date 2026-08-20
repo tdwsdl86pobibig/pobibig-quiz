@@ -1774,6 +1774,9 @@ function renderLeaderboardScreen(data){
   // [수정] 선생님 화면처럼, 학생 본인 화면에도 자기 팀과 점수를 눈에 띄게 보여줍니다.
   // [디자인 개선] "내 팀:", "내 점수:" 같은 라벨 텍스트를 없애고, 순위 뱃지 · 팀 색상점 · 큰 점수
   // 숫자만으로 한눈에 읽히도록 정리했습니다.
+  // [버그 수정] 팀전일 때 이 박스가 "내 개인 점수"를 보여주고 있어서, 같은 팀 학생들 화면마다
+  // 서로 다른 점수/순위가 표시되고 있었습니다. 팀에 속한 모든 학생의 개인 점수(data.players)를
+  // 실시간으로 합산해서 진짜 팀 총점과 팀 순위를 계산해서 보여주도록 고쳤습니다.
   const myScoreBox = document.getElementById('leaderboard-my-score');
   myScoreBox.classList.add('hidden');
   myScoreBox.classList.add('flex','items-center','justify-between','gap-3');
@@ -1783,19 +1786,42 @@ function renderLeaderboardScreen(data){
     const myIndex = ranked.findIndex(p => p.pid === state.playerId);
     if(myIndex !== -1){
       const me = ranked[myIndex];
-      const myTeam = (window.TeamSystem && typeof window.TeamSystem.getTeam === 'function')
-        ? window.TeamSystem.getTeam(state.playerId) : null;
-      const rankBadge = `<span class="shrink-0 px-3 py-1 rounded-full text-sm font-black text-white" style="background:${myTeam ? myTeam.color : 'var(--pastel-purple)'}">${myIndex+1}위</span>`;
-      const teamLabel = myTeam
-        ? `<span class="flex items-center gap-1.5 font-bold truncate"><span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background:${myTeam.color}"></span>${escapeHtml(myTeam.name)}</span>`
+      const teamConfig = data.teamConfig;
+      const assignments = (teamConfig && teamConfig.assignments) || {};
+      const myTeamId = assignments[state.playerId];
+
+      let myTeamInfo = null;
+      let displayScore = me.score || 0;
+      let displayRank = myIndex + 1;
+
+      if(myTeamId && teamConfig && Array.isArray(teamConfig.teams)){
+        const totals = {};
+        ranked.forEach(p => {
+          const tid = assignments[p.pid];
+          if(!tid) return;
+          totals[tid] = (totals[tid] || 0) + (Number(p.score) || 0);
+        });
+        const rankedTeams = teamConfig.teams
+          .map(t => ({ ...t, score: totals[t.id] || 0 }))
+          .sort((a,b) => b.score - a.score);
+        myTeamInfo = rankedTeams.find(t => t.id === myTeamId) || null;
+        if(myTeamInfo){
+          displayScore = myTeamInfo.score;
+          displayRank = rankedTeams.findIndex(t => t.id === myTeamId) + 1;
+        }
+      }
+
+      const rankBadge = `<span class="shrink-0 px-3 py-1 rounded-full text-sm font-black text-white" style="background:${myTeamInfo ? myTeamInfo.color : 'var(--pastel-purple)'}">${displayRank}위</span>`;
+      const teamLabel = myTeamInfo
+        ? `<span class="flex items-center gap-1.5 font-bold truncate"><span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background:${myTeamInfo.color}"></span>${escapeHtml(myTeamInfo.name)}</span>`
         : '';
       myScoreBox.innerHTML = `
         <span class="flex items-center gap-2 min-w-0">${rankBadge}${teamLabel}</span>
-        <span class="font-black text-2xl text-[var(--pastel-purple)] shrink-0">${me.score||0}점</span>
+        <span class="font-black text-2xl text-[var(--pastel-purple)] shrink-0">${displayScore}점</span>
       `;
-      if(myTeam){
-        myScoreBox.style.border = `3px solid ${myTeam.color}`;
-        myScoreBox.style.boxShadow = `0 0 0 3px ${myTeam.color}33`;
+      if(myTeamInfo){
+        myScoreBox.style.border = `3px solid ${myTeamInfo.color}`;
+        myScoreBox.style.boxShadow = `0 0 0 3px ${myTeamInfo.color}33`;
       }
       myScoreBox.classList.remove('hidden');
     }
