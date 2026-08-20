@@ -494,9 +494,7 @@
 
   <section id="screen-leaderboard" class="hidden w-full min-h-screen px-4 py-8 flex flex-col items-center">
     <h2 class="font-display text-3xl font-bold neon-text mb-6 pt-6"><i class="fa-solid fa-ranking-star mr-2"></i>실시간 순위</h2>
-    <div id="leaderboard-my-score" class="hidden glass rounded-[1.6rem] px-6 py-3 mb-4 text-center">
-      <span id="leaderboard-my-score-text" class="font-bold text-lg text-[var(--pastel-purple)]"></span>
-    </div>
+    <div id="leaderboard-my-score" class="hidden glass rounded-[1.6rem] px-6 py-3 mb-4 w-full max-w-md"></div>
     <div id="leaderboard-list" class="w-full max-w-xl flex flex-col gap-2 mb-8"></div>
     <div id="host-leaderboard-controls" class="hidden">
       <button onclick="hostNextQuestion()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
@@ -509,9 +507,7 @@
   <section id="screen-podium" class="hidden w-full min-h-screen px-4 py-10 flex flex-col items-center justify-center overflow-y-auto relative">
     <h2 class="font-display text-4xl font-extrabold neon-text mb-4"><i class="fa-solid fa-trophy mr-2"></i>최종 결과</h2>
 
-    <div id="podium-my-score" class="hidden glass rounded-[1.6rem] px-6 py-3 mb-6 text-center">
-      <span id="podium-my-score-text" class="font-bold text-lg text-[var(--pastel-purple)]"></span>
-    </div>
+    <div id="podium-my-score" class="hidden glass rounded-[1.6rem] px-6 py-3 mb-6 w-full max-w-md"></div>
 
     <div class="flex items-end gap-3 md:gap-6 mb-8" id="podium-wrap">
       <div class="flex flex-col items-center">
@@ -1776,22 +1772,30 @@ function renderLeaderboardScreen(data){
   });
 
   // [수정] 선생님 화면처럼, 학생 본인 화면에도 자기 팀과 점수를 눈에 띄게 보여줍니다.
+  // [디자인 개선] "내 팀:", "내 점수:" 같은 라벨 텍스트를 없애고, 순위 뱃지 · 팀 색상점 · 큰 점수
+  // 숫자만으로 한눈에 읽히도록 정리했습니다.
   const myScoreBox = document.getElementById('leaderboard-my-score');
-  const myScoreText = document.getElementById('leaderboard-my-score-text');
   myScoreBox.classList.add('hidden');
+  myScoreBox.classList.add('flex','items-center','justify-between','gap-3');
   myScoreBox.style.border = '';
+  myScoreBox.style.boxShadow = '';
   if(!state.isHost && state.playerId){
     const myIndex = ranked.findIndex(p => p.pid === state.playerId);
     if(myIndex !== -1){
       const me = ranked[myIndex];
       const myTeam = (window.TeamSystem && typeof window.TeamSystem.getTeam === 'function')
         ? window.TeamSystem.getTeam(state.playerId) : null;
+      const rankBadge = `<span class="shrink-0 px-3 py-1 rounded-full text-sm font-black text-white" style="background:${myTeam ? myTeam.color : 'var(--pastel-purple)'}">${myIndex+1}위</span>`;
+      const teamLabel = myTeam
+        ? `<span class="flex items-center gap-1.5 font-bold truncate"><span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background:${myTeam.color}"></span>${escapeHtml(myTeam.name)}</span>`
+        : '';
+      myScoreBox.innerHTML = `
+        <span class="flex items-center gap-2 min-w-0">${rankBadge}${teamLabel}</span>
+        <span class="font-black text-2xl text-[var(--pastel-purple)] shrink-0">${me.score||0}점</span>
+      `;
       if(myTeam){
-        myScoreText.innerText = `${myIndex+1}위 · 내 팀: ${myTeam.name} · 내 점수: ${me.score||0}점`;
         myScoreBox.style.border = `3px solid ${myTeam.color}`;
         myScoreBox.style.boxShadow = `0 0 0 3px ${myTeam.color}33`;
-      } else {
-        myScoreText.innerText = `${myIndex+1}위 · 내 점수: ${me.score||0}점`;
       }
       myScoreBox.classList.remove('hidden');
     }
@@ -1811,16 +1815,30 @@ function renderPodiumScreen(data){
   const runnersUpWrap = document.getElementById('podium-runners-up-wrap');
   const runnersUpList = document.getElementById('podium-runners-up-list');
   const myScoreBox = document.getElementById('podium-my-score');
-  const myScoreText = document.getElementById('podium-my-score-text');
   runnersUpList.innerHTML = '';
   myScoreBox.classList.add('hidden');
+  myScoreBox.classList.add('flex','items-center','justify-between','gap-3');
+  myScoreBox.style.border = '';
+  myScoreBox.style.boxShadow = '';
 
   const teamConfig = data.teamConfig;
   const teamMode = !!(teamConfig && teamConfig.enabled && Array.isArray(teamConfig.teams) && teamConfig.teams.length > 0);
 
   if(teamMode){
     // 팀전: 시상대를 개인 점수 대신 팀 이름 + 팀 점수로 표시합니다.
-    const rankedTeams = teamConfig.teams.slice().sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+    // [버그 수정] teamConfig.teams[].score 필드는 문제를 맞혀도 갱신되지 않아 항상 0으로 남아
+    // 있었습니다. 정답을 맞힐 때마다 실제로 갱신되는 개인 점수(data.players[pid].score)를
+    // 팀 배정 정보(teamConfig.assignments) 기준으로 팀별 합산해서 진짜 팀 총점을 계산합니다.
+    const assignments = teamConfig.assignments || {};
+    const teamTotals = {};
+    Object.entries(data.players || {}).forEach(([pid, p]) => {
+      const teamId = assignments[pid];
+      if(!teamId) return;
+      teamTotals[teamId] = (teamTotals[teamId] || 0) + (Number(p.score) || 0);
+    });
+    const rankedTeams = teamConfig.teams
+      .map(t => ({ ...t, score: teamTotals[t.id] !== undefined ? teamTotals[t.id] : (Number(t.score) || 0) }))
+      .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
 
     [1, 2, 3].forEach((rank, i) => {
       const t = rankedTeams[i];
@@ -1862,7 +1880,17 @@ function renderPodiumScreen(data){
       const myTeam = myTeamId ? rankedTeams.find(t => t.id === myTeamId) : null;
       if(myTeam){
         const myRank = rankedTeams.findIndex(t => t.id === myTeamId) + 1;
-        myScoreText.innerText = `우리 팀: ${myTeam.name} · ${myRank}위 · ${Number(myTeam.score)||0}점`;
+        myScoreBox.innerHTML = `
+          <span class="flex items-center gap-2 min-w-0">
+            <span class="shrink-0 px-3 py-1 rounded-full text-sm font-black text-white" style="background:${myTeam.color}">${myRank}위</span>
+            <span class="flex items-center gap-1.5 font-bold truncate">
+              <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background:${myTeam.color}"></span>${escapeHtml(myTeam.name)}
+            </span>
+          </span>
+          <span class="font-black text-2xl text-[var(--pastel-purple)] shrink-0">${Number(myTeam.score)||0}점</span>
+        `;
+        myScoreBox.style.border = `3px solid ${myTeam.color}`;
+        myScoreBox.style.boxShadow = `0 0 0 3px ${myTeam.color}33`;
         myScoreBox.classList.remove('hidden');
       }
     }
@@ -1905,7 +1933,10 @@ function renderPodiumScreen(data){
     if(!state.isHost && state.playerId){
       const myIndex = ranked.findIndex(p => p.pid === state.playerId);
       if(myIndex !== -1){
-        myScoreText.innerText = `내 최종 점수: ${myIndex+1}위 · ${ranked[myIndex].score||0}점`;
+        myScoreBox.innerHTML = `
+          <span class="shrink-0 px-3 py-1 rounded-full text-sm font-black text-white" style="background:var(--pastel-purple)">${myIndex+1}위</span>
+          <span class="font-black text-2xl text-[var(--pastel-purple)] shrink-0">${ranked[myIndex].score||0}점</span>
+        `;
         myScoreBox.classList.remove('hidden');
       }
     }
