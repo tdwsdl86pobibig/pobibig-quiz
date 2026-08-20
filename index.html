@@ -192,7 +192,7 @@
   <div class="glass w-full max-w-sm rounded-[2rem] p-6 flex flex-col max-h-[80vh]">
     <div class="flex items-center justify-between mb-4">
       <h3 id="modal-choice-title" class="font-bold text-lg flex items-center gap-2"></h3>
-      <button onclick="closeVoterModal()" class="text-white/50 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+      <button onclick="playPop();closeVoterModal()" class="text-white/50 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div id="modal-voter-list" class="flex flex-col gap-2 overflow-y-auto pr-1 flex-1"></div>
   </div>
@@ -215,7 +215,7 @@
   </section>
 
   <section id="screen-teacher-auth" class="hidden w-full min-h-screen px-6 py-8 flex flex-col items-center justify-center">
-    <button onclick="goTo('screen-landing')" class="fixed top-3 left-3 z-40 glass rounded-full px-4 py-2 text-sm font-bold text-white/60 hover:text-white flex items-center gap-1.5">
+    <button onclick="playClick();goTo('screen-landing')" class="fixed top-3 left-3 z-40 glass rounded-full px-4 py-2 text-sm font-bold text-white/60 hover:text-white flex items-center gap-1.5">
       <i class="fa-solid fa-arrow-left"></i> 뒤로가기
     </button>
     <div class="w-full max-w-sm">
@@ -237,7 +237,7 @@
         <div class="relative mb-3">
           <input id="teacher-password-input" type="password" autocomplete="current-password" placeholder="6자 이상"
                  class="w-full rounded-2xl px-3 py-3 pr-11 outline-none font-bold">
-          <button type="button" onclick="togglePasswordVisibility('teacher-password-input', this)"
+          <button type="button" onclick="playPop();togglePasswordVisibility('teacher-password-input', this)"
                   class="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70">
             <i class="fa-solid fa-eye"></i>
           </button>
@@ -247,7 +247,7 @@
           <div class="relative">
             <input id="teacher-password-confirm-input" type="password" autocomplete="new-password" placeholder="비밀번호를 한 번 더 입력해주세요"
                    class="w-full rounded-2xl px-3 py-3 pr-11 outline-none font-bold">
-            <button type="button" onclick="togglePasswordVisibility('teacher-password-confirm-input', this)"
+            <button type="button" onclick="playPop();togglePasswordVisibility('teacher-password-confirm-input', this)"
                     class="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70">
               <i class="fa-solid fa-eye"></i>
             </button>
@@ -277,7 +277,7 @@
       <div class="flex items-center gap-3">
         <button id="teacher-account-label" class="text-xs font-bold text-ink max-w-[170px] truncate"></button>
         <button onclick="teacherLogout()" class="text-rose-500 font-bold text-sm"><i class="fa-solid fa-right-from-bracket mr-1"></i>로그아웃</button>
-        <button onclick="goTo('screen-landing')" class="text-white/50 hover:text-white"><i class="fa-solid fa-arrow-left"></i> 뒤로</button>
+        <button onclick="playClick();goTo('screen-landing')" class="text-white/50 hover:text-white"><i class="fa-solid fa-arrow-left"></i> 뒤로</button>
       </div>
     </div>
 
@@ -357,16 +357,21 @@
             <i class="fa-solid fa-image mr-1"></i>사진 선택
             <input type="file" id="q-image-input" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
           </label>
+          <label class="text-xs glass rounded-2xl px-3 py-2 cursor-pointer font-bold">
+            <i class="fa-solid fa-file-video mr-1"></i>내 영상 올리기
+            <input type="file" id="q-video-file-input" accept="video/*" class="hidden" onchange="handleVideoFileSelect(event)">
+          </label>
           <input id="q-video-input" type="text" placeholder="유튜브 또는 영상 링크 URL" class="flex-1 min-w-[10rem] rounded-2xl px-3 py-2 text-xs outline-none">
-          <button onclick="clearMediaDraft()" class="text-xs text-rose-500 font-bold px-2">제거</button>
+          <button onclick="playDelete();clearMediaDraft()" class="text-xs text-rose-500 font-bold px-2">제거</button>
         </div>
+        <p id="video-upload-status" class="hidden text-xs font-bold text-[var(--pastel-purple)] mt-2"></p>
         <img id="q-image-preview" class="hidden mt-2 rounded-xl max-h-32 mx-auto" />
       </div>
 
       <button onclick="addQuestionToDraft()" id="add-question-btn" class="glow-btn bg-gradient-to-r from-[var(--pastel-purple)] to-[var(--pastel-pink)] rounded-2xl py-3 font-bold w-full">
         <i class="fa-solid fa-plus mr-1"></i> 문제 리스트에 추가
       </button>
-      <button onclick="cancelQuestionEdit()" id="cancel-question-edit-btn" class="hidden mt-2 w-full glass rounded-2xl py-2 font-bold text-rose-500 text-sm">
+      <button onclick="playPop();cancelQuestionEdit()" id="cancel-question-edit-btn" class="hidden mt-2 w-full glass rounded-2xl py-2 font-bold text-rose-500 text-sm">
         <i class="fa-solid fa-xmark mr-1"></i> 문제 수정 취소
       </button>
     </div>
@@ -379,7 +384,7 @@
         <button id="save-bank-btn" onclick="saveDraftQuiz()" class="glow-btn bg-gradient-to-r from-[var(--pastel-mint)] to-emerald-300 rounded-2xl py-3 font-bold flex-1">
           <i class="fa-solid fa-floppy-disk mr-1"></i> 이 퀴즈를 문제 은행에 저장
         </button>
-        <button id="cancel-edit-btn" onclick="cancelQuizEdit()" class="hidden glass rounded-2xl px-4 py-3 font-bold text-rose-500 hover:bg-rose-50">
+        <button id="cancel-edit-btn" onclick="playPop();cancelQuizEdit()" class="hidden glass rounded-2xl px-4 py-3 font-bold text-rose-500 hover:bg-rose-50">
           수정 취소
         </button>
       </div>
@@ -397,13 +402,17 @@
     <button onclick="exitHostLobby()" class="fixed top-3 left-3 z-40 glass rounded-full px-4 py-2 text-sm font-bold text-white/60 hover:text-white flex items-center gap-1.5">
       <i class="fa-solid fa-arrow-left"></i> 뒤로가기
     </button>
-    <p class="text-white/50 mb-1 font-bold pt-6">참가 코드 (PIN)</p>
-    <div id="lobby-pin" class="pin-digit text-6xl md:text-7xl font-extrabold neon-text mb-2">------</div>
-    <p class="text-white/40 text-sm mb-4"><i class="fa-solid fa-mobile-screen-button mr-1"></i>학생들에게 이 PIN을 알려주세요</p>
+    <div class="w-full flex flex-col sm:flex-row items-center justify-center gap-6 pt-6 mb-6">
+      <div class="flex flex-col items-center">
+        <p class="text-white/50 mb-1 font-bold">참가 코드 (PIN)</p>
+        <div id="lobby-pin" class="pin-digit text-6xl md:text-7xl font-extrabold neon-text mb-2">------</div>
+        <p class="text-white/40 text-sm"><i class="fa-solid fa-mobile-screen-button mr-1"></i>학생들에게 이 PIN을 알려주세요</p>
+      </div>
 
-    <div class="glass rounded-[1.6rem] p-4 mb-6 flex flex-col items-center gap-2">
-      <div id="lobby-qrcode" class="bg-white p-2 rounded-xl"></div>
-      <p class="text-white/40 text-xs font-bold text-center"><i class="fa-solid fa-qrcode mr-1"></i>QR코드를 스캔하면 PIN 입력 없이 바로 참여할 수 있어요</p>
+      <div class="glass rounded-[1.6rem] p-4 flex flex-col items-center gap-2">
+        <div id="lobby-qrcode" class="bg-white p-2 rounded-xl"></div>
+        <p class="text-white/40 text-xs font-bold text-center"><i class="fa-solid fa-qrcode mr-1"></i>QR코드를 스캔하면 PIN 입력 없이 바로 참여할 수 있어요</p>
+      </div>
     </div>
 
     <div class="glass rounded-[1.9rem] px-6 py-3 mb-6 flex items-center gap-3">
@@ -414,7 +423,7 @@
 
     <div id="lobby-player-grid" class="w-full max-w-4xl grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-8 px-2"></div>
 
-    <button onclick="startCountdownAndStartGame()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] via-[var(--pastel-purple)] to-[var(--pastel-blue)] rounded-[1.9rem] px-10 py-4 font-display font-extrabold text-2xl">
+    <button onclick="playClick();startCountdownAndStartGame()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] via-[var(--pastel-purple)] to-[var(--pastel-blue)] rounded-[1.9rem] px-10 py-4 font-display font-extrabold text-2xl">
       <i class="fa-solid fa-play mr-2"></i>게임 시작
     </button>
   </section>
@@ -423,7 +432,7 @@
     <div class="w-full max-w-4xl flex items-center justify-between mb-4 pt-10 sm:pt-4">
       <span class="glass rounded-full px-4 py-1.5 text-sm font-bold" id="host-q-index">문제 1</span>
       <div class="flex items-center gap-3">
-        <button onclick="hostToggleTimer()" id="host-pause-btn" class="glass rounded-full w-10 h-10 flex items-center justify-center text-lg">
+        <button onclick="playPop();hostToggleTimer()" id="host-pause-btn" class="glass rounded-full w-10 h-10 flex items-center justify-center text-lg">
           <i class="fa-solid fa-pause"></i>
         </button>
         <div id="host-timer" class="glass rounded-full w-11 h-11 flex items-center justify-center font-extrabold text-lg text-amber-600">30</div>
@@ -456,7 +465,7 @@
       <span id="host-submitted-count" class="font-bold text-xl">0</span> / <span id="host-total-count">0</span> 명 제출완료
     </div>
 
-    <button id="host-reveal-btn" onclick="hostForceReveal()" class="glow-btn bg-gradient-to-r from-[var(--pastel-purple)] to-[var(--pastel-blue)] rounded-[1.6rem] px-6 py-2.5 font-bold text-sm">
+    <button id="host-reveal-btn" onclick="playWhoosh();hostForceReveal()" class="glow-btn bg-gradient-to-r from-[var(--pastel-purple)] to-[var(--pastel-blue)] rounded-[1.6rem] px-6 py-2.5 font-bold text-sm">
       <i class="fa-solid fa-forward-step mr-1"></i> 바로 정답 공개 및 채점
     </button>
   </section>
@@ -529,7 +538,7 @@
       <div id="subjective-answers-list" class="flex flex-col gap-2 max-h-60 overflow-y-auto"></div>
     </div>
 
-    <button onclick="hostShowExplanation()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
+    <button onclick="playClick();hostShowExplanation()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
       문제 해설 보기 <i class="fa-solid fa-lightbulb ml-1"></i>
     </button>
   </section>
@@ -550,7 +559,7 @@
       </div>
 
       <div id="host-explanation-controls">
-        <button onclick="hostShowLeaderboard()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
+        <button onclick="playClick();hostShowLeaderboard()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
           순위 확인하기 <i class="fa-solid fa-arrow-right ml-1"></i>
         </button>
       </div>
@@ -580,21 +589,21 @@
     <div class="flex items-end gap-3 md:gap-6 mb-8" id="podium-wrap">
       <div class="flex flex-col items-center">
         <div class="text-3xl mb-1">🥈</div>
-        <div id="podium-name-2" class="font-bold mb-1 text-center max-w-[6rem] truncate"></div>
-        <div class="podium-bar w-20 md:w-28 bg-gradient-to-t from-slate-300 to-slate-100 rounded-t-[1.5rem] flex items-start justify-center pt-2 font-extrabold text-slate-600" style="height:0px" id="podium-bar-2">2</div>
-        <div id="podium-score-2" class="font-bold text-sm mt-1.5 text-[var(--pastel-purple)]"></div>
+        <div id="podium-name-2" class="font-extrabold text-lg mb-1 text-center max-w-[7rem] truncate"></div>
+        <div class="podium-bar w-20 md:w-28 bg-gradient-to-t from-slate-300 to-slate-100 rounded-t-[1.5rem] flex items-start justify-center pt-2 text-2xl font-black text-slate-600" style="height:0px" id="podium-bar-2">2</div>
+        <div id="podium-score-2" class="font-black text-2xl md:text-3xl mt-2 text-[var(--pastel-purple)]" style="text-shadow:0 1px 0 #fff"></div>
       </div>
       <div class="flex flex-col items-center">
         <div class="text-4xl mb-1">👑</div>
-        <div id="podium-name-1" class="font-bold mb-1 text-center max-w-[7rem] truncate"></div>
-        <div class="podium-bar w-24 md:w-32 bg-gradient-to-t from-[var(--pastel-yellow)] to-yellow-100 rounded-t-[1.5rem] flex items-start justify-center pt-2 font-extrabold text-amber-700" style="height:0px" id="podium-bar-1">1</div>
-        <div id="podium-score-1" class="font-bold text-sm mt-1.5 text-[var(--pastel-purple)]"></div>
+        <div id="podium-name-1" class="font-extrabold text-xl mb-1 text-center max-w-[8rem] truncate"></div>
+        <div class="podium-bar w-24 md:w-32 bg-gradient-to-t from-[var(--pastel-yellow)] to-yellow-100 rounded-t-[1.5rem] flex items-start justify-center pt-2 text-2xl font-black text-amber-700" style="height:0px" id="podium-bar-1">1</div>
+        <div id="podium-score-1" class="font-black text-3xl md:text-4xl mt-2 text-[var(--pastel-purple)]" style="text-shadow:0 1px 0 #fff"></div>
       </div>
       <div class="flex flex-col items-center">
         <div class="text-2xl mb-1">🥉</div>
-        <div id="podium-name-3" class="font-bold mb-1 text-center max-w-[6rem] truncate"></div>
-        <div class="podium-bar w-16 md:w-24 bg-gradient-to-t from-amber-400 to-amber-200 rounded-t-[1.5rem] flex items-start justify-center pt-2 font-extrabold text-amber-800" style="height:0px" id="podium-bar-3">3</div>
-        <div id="podium-score-3" class="font-bold text-sm mt-1.5 text-[var(--pastel-purple)]"></div>
+        <div id="podium-name-3" class="font-extrabold text-lg mb-1 text-center max-w-[7rem] truncate"></div>
+        <div class="podium-bar w-16 md:w-24 bg-gradient-to-t from-amber-400 to-amber-200 rounded-t-[1.5rem] flex items-start justify-center pt-2 text-2xl font-black text-amber-800" style="height:0px" id="podium-bar-3">3</div>
+        <div id="podium-score-3" class="font-black text-2xl md:text-3xl mt-2 text-[var(--pastel-purple)]" style="text-shadow:0 1px 0 #fff"></div>
       </div>
     </div>
 
@@ -603,7 +612,7 @@
       <div id="podium-runners-up-list" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1"></div>
     </div>
 
-    <button onclick="location.reload()" class="btn-reset rounded-[1.6rem] px-8 py-3.5 font-bold text-lg"><i class="fa-solid fa-rotate-left mr-2"></i>처음으로</button>
+    <button onclick="playClick();location.reload()" class="btn-reset rounded-[1.6rem] px-8 py-3.5 font-bold text-lg"><i class="fa-solid fa-rotate-left mr-2"></i>처음으로</button>
   </section>
 
   <section id="screen-student-join" class="hidden w-full min-h-screen px-6 py-8 flex flex-col items-center justify-center">
@@ -616,7 +625,7 @@
     <button id="student-join-btn" onclick="studentJoinRoom()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-10 py-3.5 font-bold text-lg w-full max-w-xs">
       <i class="fa-solid fa-right-to-bracket mr-1"></i> 입장하기
     </button>
-    <button onclick="goTo('screen-landing')" class="text-white/40 text-sm mt-6"><i class="fa-solid fa-arrow-left mr-1"></i>뒤로가기</button>
+    <button onclick="playClick();goTo('screen-landing')" class="text-base font-bold mt-6 hover:opacity-80" style="color:var(--ink)"><i class="fa-solid fa-arrow-left mr-1.5"></i>뒤로가기</button>
   </section>
 
   <section id="screen-student-lobby" class="hidden w-full min-h-screen px-6 flex flex-col items-center justify-center text-center">
@@ -704,6 +713,9 @@ import {
   signOut, updateProfile, onAuthStateChanged,
   setPersistence, browserLocalPersistence, browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB1dyDKNhx4PUF7ys8rrtwsBGemRjUqt-0",
@@ -718,6 +730,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
 const AVATAR_LIST = ['🐻','🐧','🐻‍❄️','🐴','🦕','🐱','🐶','🦊'];
 
@@ -879,6 +892,17 @@ document.addEventListener('click', unlockBgmOnce, { once: true });
 document.addEventListener('touchstart', unlockBgmOnce, { once: true });
 
 function toggleBgmMute(){
+  // [버그 수정] 예전에는 이 버튼을 처음 누르면 "브라우저 자동재생 잠금 해제"와
+  // "음소거 토글"이 같은 클릭에서 동시에 실행돼서, 막 풀린 소리가 토글 로직 때문에
+  // 곧바로 다시 꺼져버리는 문제가 있었습니다(그래서 두 번 눌러야 소리가 났습니다).
+  // 이제 첫 클릭은 "잠금 해제 + 재생 시작" 역할만 하고, 음소거 토글은 그 다음
+  // 클릭부터 정상 동작하도록 분리했습니다.
+  const wasUnlocked = bgmUnlocked;
+  unlockBgmOnce();
+  if(!wasUnlocked){
+    playClick();
+    return;
+  }
   bgmMuted = !bgmMuted;
   const player = getBgmPlayer();
   const icon = document.getElementById('bgm-toggle-icon');
@@ -887,7 +911,7 @@ function toggleBgmMute(){
     if(icon) icon.className = 'fa-solid fa-volume-xmark';
   }else{
     if(icon) icon.className = 'fa-solid fa-volume-high';
-    if(bgmUnlocked && player) player.play().catch(()=>{});
+    if(player) player.play().catch(()=>{});
   }
   playClick();
 }
@@ -1063,10 +1087,68 @@ function handleImageSelect(evt){
 }
 window.handleImageSelect = handleImageSelect;
 
+/* [기능 추가] 가지고 있는 영상 파일을 Firebase Storage에 업로드하고, 업로드가
+   끝나면 생성된 다운로드 URL을 기존 "영상 링크" 입력칸에 자동으로 채워줍니다.
+   이렇게 하면 이후 로직(youtubeEmbedUrl로 매칭 안 되면 <video> 태그로 재생)을
+   그대로 재사용할 수 있어서, 유튜브 광고 문제 없이 영상을 바로 재생할 수 있습니다. */
+const MAX_VIDEO_UPLOAD_MB = 200;
+function handleVideoFileSelect(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const fileInput = evt.target;
+  const statusEl = document.getElementById('video-upload-status');
+  const urlInput = document.getElementById('q-video-input');
+
+  if(file.size > MAX_VIDEO_UPLOAD_MB * 1024 * 1024){
+    playError();
+    alert(`영상 파일이 너무 큽니다. ${MAX_VIDEO_UPLOAD_MB}MB 이하 파일만 업로드할 수 있어요.`);
+    fileInput.value = '';
+    return;
+  }
+
+  const path = `quizMedia/${Date.now()}_${file.name}`;
+  const fileRef = storageRef(storage, path);
+  const uploadTask = uploadBytesResumable(fileRef, file);
+
+  statusEl.classList.remove('hidden');
+  statusEl.innerText = '업로드 중... 0%';
+  urlInput.value = '';
+  urlInput.disabled = true;
+
+  uploadTask.on('state_changed',
+    (snapshot) => {
+      const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+      statusEl.innerText = `업로드 중... ${pct}%`;
+    },
+    (err) => {
+      console.error('영상 업로드 실패:', err);
+      playError();
+      alert('영상 업로드에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.');
+      statusEl.classList.add('hidden');
+      urlInput.disabled = false;
+      fileInput.value = '';
+    },
+    async () => {
+      const url = await getDownloadURL(uploadTask.snapshot.ref);
+      urlInput.value = url;
+      urlInput.disabled = false;
+      statusEl.innerText = '✅ 업로드 완료! 아래 미리보기에서 확인해보세요.';
+      setTimeout(() => statusEl.classList.add('hidden'), 3000);
+      playSave();
+    }
+  );
+}
+window.handleVideoFileSelect = handleVideoFileSelect;
+
 function clearMediaDraft(){
   state.draftImage = null;
   document.getElementById('q-image-input').value = '';
   document.getElementById('q-video-input').value = '';
+  document.getElementById('q-video-input').disabled = false;
+  document.getElementById('q-video-file-input').value = '';
+  const statusEl = document.getElementById('video-upload-status');
+  statusEl.classList.add('hidden');
+  statusEl.innerText = '';
   const preview = document.getElementById('q-image-preview');
   preview.src = ''; preview.classList.add('hidden');
 }
@@ -1180,6 +1262,10 @@ function editDraftQuestion(index){
     preview.classList.add('hidden');
   }
   document.getElementById('q-video-input').value = q.videoUrl || '';
+  document.getElementById('q-video-file-input').value = '';
+  const videoStatusEl = document.getElementById('video-upload-status');
+  videoStatusEl.classList.add('hidden');
+  videoStatusEl.innerText = '';
 
   document.getElementById('add-question-btn').innerHTML = '<i class="fa-solid fa-check mr-1"></i> 문제 수정 완료';
   document.getElementById('cancel-question-edit-btn').classList.remove('hidden');
@@ -1256,6 +1342,7 @@ function renderDraftList(){
       state.draftQuestions.splice(i, 1);
       if(state.editingQuestionIndex === i) cancelQuestionEdit();
       renderDraftList();
+      playDelete();
     };
 
     btnWrap.appendChild(upBtn);
@@ -2339,6 +2426,7 @@ let teacherAuthMode = 'login';
 function showTeacherAuthError(message){
   const el = document.getElementById('teacher-auth-error');
   if(el){ el.innerText = message; el.classList.remove('hidden'); }
+  playError();
 }
 function clearTeacherAuthError(){
   const el = document.getElementById('teacher-auth-error');
@@ -2475,6 +2563,7 @@ async function submitTeacherAuth(){
       auth.currentUser.displayName || auth.currentUser.email || '선생님';
     subscribeQuizBank();
     goTo('screen-host-home');
+    playClick();
   }catch(err){
     console.error('선생님 인증 오류:', err);
     const messages = {
@@ -2901,7 +2990,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if(typeof window.playSave === 'function') window.playSave();
       alert('팀 설정이 저장되었습니다.');
     });
-    document.getElementById('team-score-btn').addEventListener('click',renderTeamScores);
+    document.getElementById('team-score-btn').addEventListener('click',()=>{
+      if(typeof window.playPop === 'function') window.playPop();
+      renderTeamScores();
+    });
     normalizeTeams(2);
   }
 
