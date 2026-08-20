@@ -764,10 +764,10 @@ function showVotersForChoice(choiceIdx){
   listEl.innerHTML = '';
 
   const voters = [];
-  Object.values(data.players || {}).forEach(p => {
+  Object.entries(data.players || {}).forEach(([pid, p]) => {
     const ans = p.answers && p.answers[data.currentIndex];
     if(ans && ans.choice === choiceIdx){
-      voters.push(p);
+      voters.push({...p, pid});
     }
   });
 
@@ -777,6 +777,13 @@ function showVotersForChoice(choiceIdx){
     voters.forEach(p => {
       const item = document.createElement('div');
       item.className = 'glass rounded-xl px-3 py-2 text-sm font-bold flex items-center justify-between';
+      // [수정] 팀전일 때 선택 학생 목록에도 팀 색 테두리를 표시합니다.
+      const teamColor = (window.TeamSystem && typeof window.TeamSystem.getPlayerColor === 'function')
+        ? window.TeamSystem.getPlayerColor(p.pid) : null;
+      if(teamColor){
+        item.style.border = `3px solid ${teamColor}`;
+        item.style.boxShadow = `0 0 0 3px ${teamColor}33`;
+      }
       item.innerHTML = `<span>${p.avatar} ${escapeHtml(p.nickname)}</span><span class="text-xs text-white/50">+${p.lastGain||0}점</span>`;
       listEl.appendChild(item);
     });
@@ -1735,6 +1742,13 @@ function renderLeaderboardScreen(data){
   ranked.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = 'glass rounded-[1.6rem] px-4 py-3 flex items-center justify-between font-bold';
+    // [수정] 팀전일 때 실시간 순위에도 각 학생의 팀 색 테두리를 표시합니다.
+    const teamColor = (window.TeamSystem && typeof window.TeamSystem.getPlayerColor === 'function')
+      ? window.TeamSystem.getPlayerColor(p.pid) : null;
+    if(teamColor){
+      row.style.border = `3px solid ${teamColor}`;
+      row.style.boxShadow = `0 0 0 3px ${teamColor}33`;
+    }
     row.innerHTML = `<div class="flex items-center gap-3"><span class="w-6">${i+1}</span><span>${p.avatar} ${escapeHtml(p.nickname)}</span></div><span>${p.score}점</span>`;
     list.appendChild(row);
   });
@@ -1813,7 +1827,9 @@ function renderPodiumScreen(data){
       const p = ranked[i];
       document.getElementById(`podium-name-${rank}`).innerText = p ? `${p.avatar} ${p.nickname}` : '-';
       const barEl = document.getElementById(`podium-bar-${rank}`);
-      barEl.innerText = rank;
+      // [수정] 예전에는 바 안에 등수 숫자(1/2/3)만 표시되어 상위 3명의 실제 점수를
+      // 알 수 없었습니다. 다른 학생들의 점수도 볼 수 있도록 점수를 표시합니다.
+      barEl.innerText = p ? `${Number(p.score)||0}점` : rank;
       barEl.style.height = p ? (i===0?180:i===1?120:80)+'px' : '30px';
     });
 
