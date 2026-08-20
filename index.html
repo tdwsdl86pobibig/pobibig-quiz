@@ -652,6 +652,14 @@ const AVATAR_LIST = ['🐻','🐧','🐻‍❄️','🐴','🦕','🐱','🐶','
 
 const state = {
   isHost: false,
+  // [버그 수정] 이 브라우저에 Firebase 로그인 세션이 남아있는지 여부는
+  // "선생님 로그인 상태"일 뿐, "지금 이 방에서 선생님 역할인지"와는 다른 개념입니다.
+  // 예전에는 onAuthStateChanged가 이 둘을 isHost 하나로 뭉뚱그려서, 선생님으로
+  // 로그인한 적 있는 기기에서 학생으로 참여해도 뒤늦게 isHost가 true로 덮어써져
+  // 학생이 선생님 대기화면(screen-host-lobby)을 보게 되는 버그가 있었습니다.
+  // 이제 teacherLoggedIn은 로그인 상태만 추적하고, isHost는 방 안에서의 실제
+  // 역할(방을 만들었는지 vs 학생으로 참가했는지)만 나타냅니다.
+  teacherLoggedIn: false,
   ownerId: null,
   pin: null,
   playerId: null,
@@ -1879,6 +1887,9 @@ async function studentJoinRoom(){
   await set(newPlayerRef, { nickname, avatar: state.selectedAvatar, score: 0 });
   onDisconnect(newPlayerRef).remove();
 
+  // [버그 수정] 학생으로 참여하는 순간, 이 기기에 남아있을 수 있는 선생님 로그인
+  // 세션과 무관하게 방 안에서의 역할은 반드시 "학생"으로 확정합니다.
+  state.isHost = false;
   state.pin = pin; state.playerId = pid; state.nickname = nickname; state.hasJoined = true;
   document.getElementById('student-my-nickname').innerText = nickname;
   document.getElementById('student-lobby-avatar').innerText = state.selectedAvatar;
@@ -1956,6 +1967,7 @@ window.toggleTeacherAuthMode = toggleTeacherAuthMode;
 function openTeacherEntry(){
   if(auth.currentUser){
     state.isHost = true;
+    state.teacherLoggedIn = true;
     state.ownerId = auth.currentUser.uid;
     document.getElementById('teacher-account-label').innerText =
       auth.currentUser.displayName || auth.currentUser.email || '선생님';
@@ -1992,6 +2004,7 @@ async function submitTeacherAuth(){
       await signInWithEmailAndPassword(auth, email, password);
     }
     state.isHost = true;
+    state.teacherLoggedIn = true;
     state.ownerId = auth.currentUser.uid;
     document.getElementById('teacher-account-label').innerText =
       auth.currentUser.displayName || auth.currentUser.email || '선생님';
@@ -2021,6 +2034,7 @@ async function teacherLogout(){
   try{
     await signOut(auth);
     state.isHost = false;
+    state.teacherLoggedIn = false;
     state.ownerId = null;
     state.pin = null;
     state.quiz = null;
@@ -2036,14 +2050,19 @@ async function teacherLogout(){
 window.teacherLogout = teacherLogout;
 
 onAuthStateChanged(auth, (user) => {
+  // [버그 수정] 여기서는 "선생님 로그인 여부(teacherLoggedIn)"만 갱신합니다.
+  // 방 안에서의 역할(isHost)은 절대 여기서 건드리지 않습니다 — 그래야 학생으로
+  // 참여 중인데 이 기기에 선생님 로그인 세션이 남아있어서 뒤늦게 isHost가
+  // true로 덮어써지는 일이 생기지 않습니다. isHost는 오직 방을 만들 때
+  // (createRoomWithQuiz) 또는 학생으로 참여할 때(studentJoinRoom)만 설정됩니다.
   if(user){
-    state.isHost = true;
+    state.teacherLoggedIn = true;
     state.ownerId = user.uid;
     const label = document.getElementById('teacher-account-label');
     if(label) label.innerText = user.displayName || user.email || '선생님';
     subscribeQuizBank();
   }else{
-    state.isHost = false;
+    state.teacherLoggedIn = false;
     state.ownerId = null;
     state.quizBankCache = {};
     if(document.getElementById('quiz-bank-list')) renderQuizBank();
