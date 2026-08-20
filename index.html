@@ -253,7 +253,7 @@
             </button>
           </div>
         </div>
-        <label class="flex items-center gap-2 mb-4 cursor-pointer select-none">
+        <label id="teacher-remember-me-wrap" class="flex items-center gap-2 mb-4 cursor-pointer select-none">
           <input id="teacher-remember-me-input" type="checkbox" checked
                  class="w-4 h-4 rounded accent-[var(--pastel-purple)]">
           <span class="text-sm font-bold text-white/70">로그인 정보 기억하기</span>
@@ -2257,29 +2257,44 @@ function startLobbyTimer(){
 }
 
 async function studentJoinRoom(){
+  // [버그 수정] "입장하기" 버튼을 빠르게 두 번 누르면, 첫 번째 클릭의 비동기 작업(방
+  // 조회 → 플레이어 추가)이 끝나기 전에 두 번째 클릭이 또 실행되어 같은 닉네임의
+  // 학생이 두 명 생성되는 문제가 있었습니다. 진행 중 플래그와 버튼 비활성화로
+  // 중복 클릭 자체를 막습니다.
+  if(state.joinInProgress) return;
   const pin = document.getElementById('student-pin-input').value.trim();
   const nickname = document.getElementById('student-nickname-input').value.trim();
   if(!pin || !nickname) return;
 
-  const roomSnap = await get(ref(db, `rooms/${pin}`));
-  if(!roomSnap.exists()) return;
+  state.joinInProgress = true;
+  const btn = document.getElementById('student-join-btn');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.classList.add('opacity-60','pointer-events-none'); }
 
-  const newPlayerRef = push(ref(db, `rooms/${pin}/players`));
-  const pid = newPlayerRef.key;
-  await set(newPlayerRef, { nickname, avatar: state.selectedAvatar, score: 0 });
-  onDisconnect(newPlayerRef).remove();
+  try{
+    const roomSnap = await get(ref(db, `rooms/${pin}`));
+    if(!roomSnap.exists()) return;
 
-  // [버그 수정] 학생으로 참여하는 순간, 이 기기에 남아있을 수 있는 선생님 로그인
-  // 세션과 무관하게 방 안에서의 역할은 반드시 "학생"으로 확정합니다.
-  state.isHost = false;
-  state.pin = pin; state.playerId = pid; state.nickname = nickname; state.hasJoined = true;
-  document.getElementById('student-my-nickname').innerText = nickname;
-  document.getElementById('student-lobby-avatar').innerText = state.selectedAvatar;
+    const newPlayerRef = push(ref(db, `rooms/${pin}/players`));
+    const pid = newPlayerRef.key;
+    await set(newPlayerRef, { nickname, avatar: state.selectedAvatar, score: 0 });
+    onDisconnect(newPlayerRef).remove();
 
-  goTo('screen-student-lobby');
-  startLobbyTimer();
-  subscribeRoom(pin);
-  playJoin();
+    // [버그 수정] 학생으로 참여하는 순간, 이 기기에 남아있을 수 있는 선생님 로그인
+    // 세션과 무관하게 방 안에서의 역할은 반드시 "학생"으로 확정합니다.
+    state.isHost = false;
+    state.pin = pin; state.playerId = pid; state.nickname = nickname; state.hasJoined = true;
+    document.getElementById('student-my-nickname').innerText = nickname;
+    document.getElementById('student-lobby-avatar').innerText = state.selectedAvatar;
+
+    goTo('screen-student-lobby');
+    startLobbyTimer();
+    subscribeRoom(pin);
+    playJoin();
+  } finally {
+    state.joinInProgress = false;
+    if(btn){ btn.disabled = false; btn.classList.remove('opacity-60','pointer-events-none'); btn.innerHTML = originalHtml; }
+  }
 }
 window.studentJoinRoom = studentJoinRoom;
 
@@ -2337,6 +2352,11 @@ function setTeacherAuthMode(mode){
   document.getElementById('teacher-name-wrap').classList.toggle('hidden', !signup);
   document.getElementById('teacher-password-confirm-wrap').classList.toggle('hidden', !signup);
   document.getElementById('teacher-password-confirm-input').value = '';
+  // [버그 수정] "로그인 정보 기억하기"는 로그인 화면에서만 의미가 있는 옵션인데
+  // 회원가입 화면에도 그대로 노출되고 있었습니다. 회원가입 시에는 체크박스를
+  // 숨기고, 가입 직후에는 로그인 상태가 유지되도록 값은 항상 체크된 상태로 둡니다.
+  document.getElementById('teacher-remember-me-wrap').classList.toggle('hidden', signup);
+  if(signup) document.getElementById('teacher-remember-me-input').checked = true;
   document.getElementById('teacher-auth-toggle').innerText =
     signup ? '이미 계정이 있나요? 로그인' : '처음이신가요? 회원가입';
   document.getElementById('teacher-password-input').autocomplete = signup ? 'new-password' : 'current-password';
