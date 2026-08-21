@@ -776,8 +776,7 @@ const state = {
   editingQuestionIndex: null, // 문제 목록 내에서 개별 문제를 수정 중일 때의 인덱스
   quizBankCache: {},
   lastMediaKey: null,
-  lastCountdownVal: null,
-  _podiumSequenceStarted: false // 시상식 3-2-1 연출(드럼롤→1위 공개→팡파레)이 이미 시작됐는지 여부
+  lastCountdownVal: null
 };
 
 /* 오디오 효과음 처리 */
@@ -830,22 +829,6 @@ function playWhoosh(){ playTone(300,0.18,'sine',0.08); playTone(150,0.22,'sine',
 function playReveal(){ playTone(440,0.08,'triangle',0.12); playTone(659.25,0.1,'triangle',0.14,0.07); }
 function playFanfare(){ [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=>playTone(f,0.22,'triangle',0.16,i*0.12)); }
 
-// [기능 추가] 시상식에서 1위를 공개하기 직전에 재생하는 "두구두구" 북소리입니다.
-// 처음엔 느리게 치다가 점점 타격 간격이 좁아지고(가속) 소리도 커지면서
-// 발표 직전의 긴장감을 살립니다.
-function playDrumroll(totalDuration=1.3){
-  try{
-    const hits = 16;
-    for(let i=0;i<hits;i++){
-      const progress = i/(hits-1);
-      // 뒤로 갈수록 타격이 촘촘해지도록 이징을 적용합니다.
-      const t = Math.pow(progress, 1.6) * totalDuration;
-      const vol = 0.08 + progress*0.12;
-      playTone(100, 0.05, 'triangle', vol, t);
-    }
-  }catch(e){}
-}
-
 window.playClick = playClick;
 window.playPop = playPop;
 window.playAdd = playAdd;
@@ -858,7 +841,6 @@ window.playSubmit = playSubmit;
 window.playWhoosh = playWhoosh;
 window.playReveal = playReveal;
 window.playFanfare = playFanfare;
-window.playDrumroll = playDrumroll;
 
 /* ===================== 배경음악(BGM) ===================== */
 // 화면을 3그룹으로 나눠 그룹이 바뀔 때만 곡을 전환합니다(같은 그룹 안 화면 이동은 끊기지 않음).
@@ -887,10 +869,6 @@ const BGM_SCREEN_GROUP = {
 let bgmUnlocked = false;  // 브라우저 자동재생 정책 때문에 사용자가 한 번은 화면을 터치/클릭해야 재생이 허용됩니다.
 let bgmMuted = false;
 let bgmCurrentGroup = null;
-// [기능 추가] 시상식 화면에 들어가자마자 시상식 BGM이 바로 나오면 3-2-1 연출(드럼롤 등)과
-// 소리가 겹쳐버립니다. 이 플래그가 true인 동안에는 트랙만 준비해두고 실제 재생은 보류했다가,
-// 1위 공개 + 팡파레가 끝난 뒤 releasePodiumBgm()에서 재생을 시작합니다.
-let podiumBgmHold = false;
 
 function getBgmPlayer(){ return document.getElementById('bgm-player'); }
 
@@ -907,7 +885,6 @@ function updateBgmForScreen(screenId){
     // 자체를 건너뛰어서, "화면을 건드리면 바로 음악이 나오던" 기능이 사라진
     // 것처럼 보였습니다. 이제는 같은 그룹이어도 아직 재생 중이 아니면(paused)
     // 잠금 해제 후 이어서 재생을 시도합니다.
-    if(group === 'podium' && podiumBgmHold) return; // 3-2-1 연출이 끝날 때까지 보류
     if(group !== 'silent' && bgmUnlocked && !bgmMuted && player.paused){
       player.play().catch(()=>{});
     }
@@ -925,18 +902,7 @@ function updateBgmForScreen(screenId){
     player.setAttribute('data-track', src);
     player.volume = 0.35; // 효과음보다 살짝 낮게, 배경에 자연스럽게 깔리도록
   }
-  if(group === 'podium' && podiumBgmHold) return; // 트랙만 준비해두고 재생은 연출이 끝난 뒤로 보류
   if(bgmUnlocked && !bgmMuted){
-    player.play().catch(()=>{});
-  }
-}
-
-// [기능 추가] 시상식 3-2-1 연출(드럼롤 → 1위 공개 → 팡파레)이 끝난 시점에 호출해서
-// 보류해뒀던 시상식 BGM 재생을 시작합니다.
-function releasePodiumBgm(){
-  podiumBgmHold = false;
-  const player = getBgmPlayer();
-  if(player && bgmUnlocked && !bgmMuted){
     player.play().catch(()=>{});
   }
 }
@@ -1615,6 +1581,14 @@ async function createRoomWithQuiz(quiz){
   const pin = generatePIN();
   state.pin = pin; state.isHost = true; state.quiz = quiz; state.currentIndex = 0;
   state.lastMediaKey = null;
+  // [버그 수정] 팀전 사용 여부는 TeamSystem 모듈 안에서 게임과 상관없이 계속 남아있는
+  // 값이라, 저번 게임에서 팀전을 켰으면 이번에 체크박스를 건드리지 않아도 새 게임에
+  // 그대로 팀전이 켜진 채로 시작되는 문제가 있었습니다. 새 방을 만들 때마다 팀전
+  // 사용 여부를 기본값(꺼짐)으로 되돌려서, 이번 게임은 항상 개인전으로 시작하고
+  // 팀전을 쓰려면 매번 다시 켜도록 합니다.
+  if(window.TeamSystem && typeof window.TeamSystem.resetForNewGame === 'function'){
+    window.TeamSystem.resetForNewGame();
+  }
   try{
     await set(ref(db, `rooms/${pin}`), {
       hostId: 'host_'+Date.now(), state: 'lobby', quiz, currentIndex: 0, timeLeft: 0, timerRunning: false, players: {}
@@ -1659,8 +1633,6 @@ async function exitHostLobby(){
     state.players = {};
     state.roomData = {};
     state._podiumSoundPlayed = false;
-    state._podiumSequenceStarted = false;
-    podiumBgmHold = false;
     goTo('screen-host-home');
     playClick();
   }
@@ -2379,16 +2351,11 @@ function renderLeaderboardScreen(data){
 }
 
 function renderPodiumScreen(data){
-  // [기능 추가] 시상식 3-2-1 연출(3위→2위→두구두구 북소리→1위 공개→팡파레+효과음+BGM)은
-  // 이 화면에 처음 들어왔을 때 딱 한 번만 재생합니다. 이후 점수 동기화 등으로
-  // 화면이 다시 그려져도 연출을 처음부터 다시 재생하지 않고 최종 상태만 반영합니다.
-  const isFirstEntry = !state._podiumSequenceStarted;
-  if(isFirstEntry){
-    state._podiumSequenceStarted = true;
-    state._podiumSoundPlayed = true; // 기존 플래그와의 호환을 위해 함께 표시해둡니다.
-    podiumBgmHold = true; // 3-2-1 연출이 끝나기 전까지 시상식 BGM 재생을 보류합니다.
-  }
   goTo('screen-podium');
+  if(!state._podiumSoundPlayed){
+    state._podiumSoundPlayed = true;
+    playFanfare();
+  }
 
   const runnersUpWrap = document.getElementById('podium-runners-up-wrap');
   const runnersUpList = document.getElementById('podium-runners-up-list');
@@ -2401,10 +2368,6 @@ function renderPodiumScreen(data){
 
   const teamConfig = data.teamConfig;
   const teamMode = !!(teamConfig && teamConfig.enabled && Array.isArray(teamConfig.teams) && teamConfig.teams.length > 0);
-
-  // rankVisuals[순위] = { nameHtml, isHtml, barHeight, scoreText } — 막대 높이와 점수는
-  // 3-2-1 연출 중에 순서대로 적용하기 위해 우선 계산만 해둡니다.
-  const rankVisuals = {};
 
   if(teamMode){
     // 팀전: 시상대를 개인 점수 대신 팀 이름 + 팀 점수로 표시합니다.
@@ -2424,14 +2387,16 @@ function renderPodiumScreen(data){
 
     [1, 2, 3].forEach((rank, i) => {
       const t = rankedTeams[i];
-      rankVisuals[rank] = {
-        isHtml: true,
-        nameHtml: t
-          ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${t.color};margin-right:4px;vertical-align:middle"></span>${escapeHtml(t.name)}`
-          : '-',
-        barHeight: t ? (i===0?180:i===1?120:80) : 30,
-        scoreText: t ? `${Number(t.score)||0}점` : ''
-      };
+      const nameEl = document.getElementById(`podium-name-${rank}`);
+      const barEl = document.getElementById(`podium-bar-${rank}`);
+      const scoreEl = document.getElementById(`podium-score-${rank}`);
+      nameEl.innerHTML = t
+        ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${t.color};margin-right:4px;vertical-align:middle"></span>${escapeHtml(t.name)}`
+        : '-';
+      // [수정] 바 안에는 등수 숫자, 그 아래 별도 요소에는 점수를 표시합니다.
+      barEl.innerText = rank;
+      barEl.style.height = t ? (i===0?180:i===1?120:80)+'px' : '30px';
+      scoreEl.innerText = t ? `${Number(t.score)||0}점` : '';
     });
 
     if (rankedTeams.length > 3) {
@@ -2481,12 +2446,13 @@ function renderPodiumScreen(data){
 
     [1, 2, 3].forEach((rank, i) => {
       const p = ranked[i];
-      rankVisuals[rank] = {
-        isHtml: false,
-        nameHtml: p ? `${p.avatar} ${p.nickname}` : '-',
-        barHeight: p ? (i===0?180:i===1?120:80) : 30,
-        scoreText: p ? `${Number(p.score)||0}점` : ''
-      };
+      document.getElementById(`podium-name-${rank}`).innerText = p ? `${p.avatar} ${p.nickname}` : '-';
+      const barEl = document.getElementById(`podium-bar-${rank}`);
+      const scoreEl = document.getElementById(`podium-score-${rank}`);
+      // [수정] 바 안에는 등수 숫자를 그대로 두고, 바로 아래 별도 요소에 점수를 표시합니다.
+      barEl.innerText = rank;
+      barEl.style.height = p ? (i===0?180:i===1?120:80)+'px' : '30px';
+      scoreEl.innerText = p ? `${Number(p.score)||0}점` : '';
     });
 
     if (ranked.length > 3) {
@@ -2521,72 +2487,9 @@ function renderPodiumScreen(data){
     }
   }
 
-  // 이름은 순위 발표 연출과 무관하게 항상 즉시 반영합니다(실시간 동기화 목적).
-  [1, 2, 3].forEach(rank => {
-    const info = rankVisuals[rank];
-    const nameEl = document.getElementById(`podium-name-${rank}`);
-    if(!info || !nameEl) return;
-    if(info.isHtml) nameEl.innerHTML = info.nameHtml; else nameEl.innerText = info.nameHtml;
-  });
-
-  if(isFirstEntry){
-    // 처음 시상식 화면에 들어왔을 때만 3위 → 2위 → (두구두구) → 1위 순서로 차례차례 공개합니다.
-    runPodiumRevealSequence(rankVisuals);
-  } else {
-    // 이미 연출이 끝난 뒤 다시 그려지는 경우(점수 재동기화 등)에는 애니메이션 없이
-    // 막대 높이와 점수만 최종 상태로 바로 반영합니다.
-    [1, 2, 3].forEach(rank => {
-      const info = rankVisuals[rank];
-      const barEl = document.getElementById(`podium-bar-${rank}`);
-      const scoreEl = document.getElementById(`podium-score-${rank}`);
-      if(!info || !barEl) return;
-      barEl.innerText = rank;
-      barEl.style.height = info.barHeight + 'px';
-      scoreEl.innerText = info.scoreText;
-    });
-  }
-}
-
-// [기능 추가] 시상식 순위 공개 연출입니다. 3위 → 2위를 차례로 솟아오르게 한 뒤,
-// 1위를 공개하기 직전에 두구두구 하는 북소리로 긴장감을 살리고 약간의 딜레이를 둡니다.
-// 이후 1위가 솟아오르면 팡파레와 색종이 효과음을 함께 터뜨리고, 그제서야 시상식
-// 배경음악을 재생합니다.
-async function runPodiumRevealSequence(rankVisuals){
-  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const reveal = (rank) => {
-    const info = rankVisuals[rank];
-    const barEl = document.getElementById(`podium-bar-${rank}`);
-    const scoreEl = document.getElementById(`podium-score-${rank}`);
-    if(!info || !barEl) return;
-    barEl.innerText = rank;
-    barEl.style.height = info.barHeight + 'px';
-    if(scoreEl) scoreEl.innerText = info.scoreText;
-  };
-
-  // 3위 공개
-  playWhoosh();
-  reveal(3);
-  await sleep(900);
-
-  // 2위 공개
-  playWhoosh();
-  reveal(2);
-  await sleep(900);
-
-  // 1위 공개 직전: 두구두구 북소리 + 약간의 딜레이로 긴장감을 살립니다.
-  playDrumroll();
-  await sleep(1500);
-
-  // 1위 공개: 기존처럼 막대가 솟아오르는 연출(CSS transition)을 그대로 사용합니다.
-  reveal(1);
-  await sleep(1600); // 막대가 다 솟아오를 때까지 기다립니다.
-
-  // 팡파레 + 색종이 효과음을 함께 터뜨리고, 그제서야 시상식 BGM을 재생합니다.
-  playFanfare();
   if(typeof confetti === 'function') {
     confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
   }
-  releasePodiumBgm();
 }
 
 function syncTimerDisplay(data){
@@ -3290,7 +3193,22 @@ document.addEventListener('DOMContentLoaded', () => {
       maxTeams:TEAM_MAX
     }; },
     load:loadTeamConfig,
-    renderScores:renderTeamScores
+    renderScores:renderTeamScores,
+    // [버그 수정] 팀전 사용 여부(state.enabled)는 모듈 안에서만 관리되는 값이라
+    // 게임이 끝나고 새 방을 만들어도 초기화되지 않고 그대로 남아있었습니다.
+    // 그래서 저번 게임에서 팀전을 켰다면, 이번엔 체크박스를 건드리지 않아도
+    // (또는 껐다고 생각해도 패널을 열어보지 않으면) 새 게임에 여전히 팀전이
+    // 켜진 채로 시작돼 개인전인데 팀 점수판이 보이는 문제가 있었습니다.
+    // 새 방을 만들 때마다 이 함수를 호출해서 팀전 사용 여부를 기본값(꺼짐)으로
+    // 되돌립니다. 팀 이름/구성은 남겨둬서 선생님이 매번 다시 만들 필요는 없게
+    // 하되, 팀 점수는 이번 게임과 섞이지 않도록 0으로 초기화합니다.
+    resetForNewGame(){
+      state.enabled = false;
+      state.teams.forEach(t => { t.score = 0; });
+      state.scores = {};
+      const cb = document.getElementById('team-enabled');
+      if(cb) cb.checked = false;
+    }
   };
 
   // Create the module but don't force the UI over the existing app.
