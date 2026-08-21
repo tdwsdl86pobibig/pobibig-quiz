@@ -736,6 +736,13 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
+// [버그 수정] Firebase Storage SDK는 업로드가 실패해도 기본적으로 최대 10분 동안
+// 조용히 자동 재시도합니다. 그래서 Storage 설정(버킷 미생성, 보안 규칙 등) 문제로
+// 업로드가 애초에 불가능한 상황이어도, 사용자에게는 "진행률도 안 올라가고 오류도
+// 안 뜨고 그냥 멈춰있는" 것처럼 보였습니다. 재시도 최대 시간을 15초로 줄여서,
+// 문제가 있으면 빠르게 오류 콜백이 호출되어 화면에 원인이 표시되도록 했습니다.
+storage.maxUploadRetryTime = 15000;
+storage.maxOperationRetryTime = 15000;
 
 const AVATAR_LIST = ['🐻','🐧','🐻‍❄️','🐴','🦕','🐱','🐶','🦊'];
 
