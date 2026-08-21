@@ -2298,7 +2298,12 @@ function renderLeaderboardScreen(data){
       let displayScore = me.score || 0;
       let displayRank = myIndex + 1;
 
-      if(myTeamId && teamConfig && Array.isArray(teamConfig.teams)){
+      // [버그 수정] 팀전이 꺼져 있어도(teamConfig.enabled === false) 학생이 예전 게임에서
+      // 자동으로 1팀에 기본 배정된 기록(teamConfig.assignments)이 남아있으면 myTeamId가
+      // 계속 존재해서, 개인전인데 "내 점수" 박스에 팀 이름/팀 점수가 표시되는 버그가
+      // 있었습니다. 위에서 계산한 teamsEnabled(=teamConfig.enabled 포함 여부)도 함께
+      // 확인해서, 팀전이 실제로 켜져 있을 때만 팀 정보를 보여주도록 고쳤습니다.
+      if(teamsEnabled && myTeamId && teamConfig && Array.isArray(teamConfig.teams)){
         const totals = {};
         ranked.forEach(p => {
           const tid = assignments[p.pid];
