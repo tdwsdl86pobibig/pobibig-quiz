@@ -573,8 +573,13 @@
     <h2 class="font-display text-3xl font-bold neon-text mb-6 pt-6"><i class="fa-solid fa-ranking-star mr-2"></i>실시간 순위</h2>
     <div id="leaderboard-my-score" class="hidden glass rounded-[1.6rem] px-6 py-3 mb-4 w-full max-w-md"></div>
     <div id="leaderboard-list" class="w-full max-w-xl flex flex-col gap-2 mb-8"></div>
+    <!-- [기능 추가] 선생님이 "다음 문제" 버튼을 누르면 학생 화면에도 이 문구가 떠서,
+         문제가 예고 없이 갑자기 시작돼 당황하는 것을 막아줍니다. -->
+    <p id="leaderboard-next-announce" class="hidden glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg text-center">
+      다음 문제가 곧 시작됩니다! <i class="fa-solid fa-forward ml-1"></i>
+    </p>
     <div id="host-leaderboard-controls" class="hidden">
-      <button onclick="hostNextQuestion()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
+      <button id="host-next-question-btn" onclick="hostNextQuestion()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
         다음 문제 <i class="fa-solid fa-forward ml-1"></i>
       </button>
     </div>
@@ -864,7 +869,20 @@ function updateBgmForScreen(screenId){
   const group = BGM_SCREEN_GROUP[screenId];
   const player = getBgmPlayer();
   if(!player || !group) return;
-  if(group === bgmCurrentGroup) return; // 같은 그룹이면 곡을 다시 시작하지 않고 그대로 이어서 재생
+  if(group === bgmCurrentGroup){
+    // [버그 수정] 같은 그룹 안에서는 곡을 새로 지정하지 않는 것까지는 맞지만,
+    // 예전 코드는 여기서 무조건 return 해버려서 "실제로 재생이 시작됐는지"는
+    // 확인하지 않았습니다. 그래서 페이지가 처음 열릴 때(자동재생 정책 때문에
+    // bgmCurrentGroup만 먼저 'lobby'로 기록되고 실제 소리는 안 나온 상태)
+    // 사용자가 화면 아무 곳이나 눌러도 "그룹이 이미 같다"는 이유로 재생 시도
+    // 자체를 건너뛰어서, "화면을 건드리면 바로 음악이 나오던" 기능이 사라진
+    // 것처럼 보였습니다. 이제는 같은 그룹이어도 아직 재생 중이 아니면(paused)
+    // 잠금 해제 후 이어서 재생을 시도합니다.
+    if(group !== 'silent' && bgmUnlocked && !bgmMuted && player.paused){
+      player.play().catch(()=>{});
+    }
+    return;
+  }
   bgmCurrentGroup = group;
   if(group === 'silent'){
     // [기능 추가] 결과 확인 · 문제 해설 · 실시간 순위 화면에서는 배경음악을 끕니다.
@@ -996,7 +1014,18 @@ function stopAllMedia(){
 }
 function goTo(screenId){
   const current = document.querySelector('#app > section:not(.hidden)');
-  if(current && current.id !== screenId && (current.id === 'screen-host-question' || current.id === 'screen-student-question')){
+  if(current && current.id === screenId){
+    // [버그 수정] 이미 이 화면을 보고 있는데도 매번 모든 화면을 hidden 처리했다가
+    // 다시 보이게 하면, display:none → block으로 바뀌는 순간 CSS 스펙상 그 안의
+    // 애니메이션(학생 카드의 pop-bounce 등)이 처음부터 다시 재생됩니다.
+    // 방 상태가 'lobby'로 유지되는 동안 카운트다운·팀 설정 저장 등으로
+    // handleRoomUpdate가 goTo('screen-host-lobby')를 계속 호출해서, 이미
+    // 보이고 있는 화면인데도 카드가 깜빡이며 다시 움직이는 것처럼 보였던
+    // 원인이 바로 이것입니다. 같은 화면이면 전환 자체를 건너뜁니다.
+    updateBgmForScreen(screenId);
+    return;
+  }
+  if(current && (current.id === 'screen-host-question' || current.id === 'screen-student-question')){
     stopAllMedia();
   }
   document.querySelectorAll('#app > section').forEach(el => el.classList.add('hidden'));
@@ -1115,26 +1144,44 @@ function handleVideoFileSelect(evt){
   urlInput.value = '';
   urlInput.disabled = true;
 
+  // [버그 수정] 예전에는 업로드 도중 오류가 나면 alert()만 띄웠는데, 모바일
+  // 브라우저(특히 파일 선택 다이얼로그가 막 닫힌 직후)에서는 alert()가 아예
+  // 표시되지 않거나 무시되는 경우가 있어서, 사용자 입장에서는 "진행도가 안
+  // 올라가고 영상도 안 올라가는데 아무 반응도 없는" 것처럼 보였습니다.
+  // 또한 업로드 자체(bytesTransferred)는 100%까지 끝났더라도, 마지막
+  // getDownloadURL() 단계에서 실패하면 그 오류를 아무도 잡아주지 않아서
+  // (async completeCb 내부의 예외를 uploadTask.on()이 처리해주지 않음)
+  // 화면이 "업로드 중..." 상태로 멈춘 채 입력창도 계속 비활성화된 상태로
+  // 남아있었습니다. 이제 실패 원인을 상태 문구에 그대로 보여주고, 어떤
+  // 단계에서 실패하든 입력창과 파일 선택을 다시 쓸 수 있게 되돌립니다.
+  function resetUploadUiOnFailure(err){
+    console.error('영상 업로드 실패:', err);
+    playError();
+    const code = (err && err.code) ? ` (${err.code})` : '';
+    statusEl.innerText = `❌ 업로드에 실패했습니다${code}. 인터넷 연결을 확인하고 다시 시도해주세요.`;
+    urlInput.disabled = false;
+    fileInput.value = '';
+  }
+
   uploadTask.on('state_changed',
     (snapshot) => {
-      const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+      const pct = snapshot.totalBytes
+        ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+        : 0;
       statusEl.innerText = `업로드 중... ${pct}%`;
     },
-    (err) => {
-      console.error('영상 업로드 실패:', err);
-      playError();
-      alert('영상 업로드에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.');
-      statusEl.classList.add('hidden');
-      urlInput.disabled = false;
-      fileInput.value = '';
-    },
+    resetUploadUiOnFailure,
     async () => {
-      const url = await getDownloadURL(uploadTask.snapshot.ref);
-      urlInput.value = url;
-      urlInput.disabled = false;
-      statusEl.innerText = '✅ 업로드 완료! 아래 미리보기에서 확인해보세요.';
-      setTimeout(() => statusEl.classList.add('hidden'), 3000);
-      playSave();
+      try{
+        const url = await getDownloadURL(uploadTask.snapshot.ref);
+        urlInput.value = url;
+        urlInput.disabled = false;
+        statusEl.innerText = '✅ 업로드 완료! 아래 미리보기에서 확인해보세요.';
+        setTimeout(() => statusEl.classList.add('hidden'), 3000);
+        playSave();
+      }catch(err){
+        resetUploadUiOnFailure(err);
+      }
     }
   );
 }
@@ -1854,14 +1901,36 @@ function hostShowLeaderboard(){ update(ref(db, `rooms/${state.pin}`), { state: '
 window.hostShowLeaderboard = hostShowLeaderboard;
 
 async function hostNextQuestion(){
+  // [기능 추가] 버튼을 누르자마자 바로 다음 문제로 넘어가면 학생들이 예고 없이
+  // 화면이 바뀌어서 당황할 수 있어서, "다음 문제가 곧 시작됩니다!" 문구를
+  // 선생님/학생 화면 모두에 잠깐(약 2초) 띄운 뒤 실제로 문제를 시작합니다.
+  // 그동안 버튼은 눌러도 반응하지 않게 막아서 중복 클릭을 방지합니다.
+  const btn = document.getElementById('host-next-question-btn');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if(btn){
+    btn.disabled = true;
+    btn.classList.add('opacity-70');
+  }
+
+  // 학생 화면에도 예고 문구가 뜨도록 방 데이터에 플래그를 기록합니다.
+  await update(ref(db, `rooms/${state.pin}`), { nextQuestionAnnounce: true });
+
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
   const nextIdx = state.currentIndex + 1;
   if(nextIdx >= state.quiz.questions.length){
-    await update(ref(db, `rooms/${state.pin}`), { state: 'podium' });
+    await update(ref(db, `rooms/${state.pin}`), { state: 'podium', nextQuestionAnnounce: null });
   } else {
     state.currentIndex = nextIdx;
-    await update(ref(db, `rooms/${state.pin}`), { state: 'question', currentIndex: nextIdx });
+    await update(ref(db, `rooms/${state.pin}`), { state: 'question', currentIndex: nextIdx, nextQuestionAnnounce: null });
     await startQuestionTimer(nextIdx);
     playRoundStart();
+  }
+
+  if(btn){
+    btn.disabled = false;
+    btn.classList.remove('opacity-70');
+    btn.innerHTML = originalHtml;
   }
 }
 window.hostNextQuestion = hostNextQuestion;
@@ -2142,19 +2211,39 @@ function renderLeaderboardScreen(data){
   }
   const ranked = Object.entries(data.players||{}).map(([pid,p])=>({pid, ...p})).sort((a,b)=>b.score-a.score);
   const list = document.getElementById('leaderboard-list'); list.innerHTML = '';
-  ranked.forEach((p, i) => {
-    const row = document.createElement('div');
-    row.className = 'glass rounded-[1.6rem] px-4 py-3 flex items-center justify-between font-bold';
-    // [수정] 팀전일 때 실시간 순위에도 각 학생의 팀 색 테두리를 표시합니다.
-    const teamColor = (window.TeamSystem && typeof window.TeamSystem.getPlayerColor === 'function')
-      ? window.TeamSystem.getPlayerColor(p.pid) : null;
-    if(teamColor){
-      row.style.border = `3px solid ${teamColor}`;
-      row.style.boxShadow = `0 0 0 3px ${teamColor}33`;
-    }
-    row.innerHTML = `<div class="flex items-center gap-3"><span class="w-6">${i+1}</span><span>${p.avatar} ${escapeHtml(p.nickname)}</span></div><span>${p.score}점</span>`;
-    list.appendChild(row);
-  });
+
+  // [기능 추가] 팀전일 때는 실시간 순위 목록에 개인 순위 대신 "팀 순위 + 팀 점수"를
+  // 보여줍니다. 개인전(팀전 미사용)은 기존 방식 그대로 개인 순위를 보여줍니다.
+  const teamConfig = data.teamConfig;
+  const teamsEnabled = !!(teamConfig && teamConfig.enabled && Array.isArray(teamConfig.teams) && teamConfig.teams.length);
+
+  if(teamsEnabled){
+    const assignments = teamConfig.assignments || {};
+    const totals = {};
+    ranked.forEach(p => {
+      const tid = assignments[p.pid];
+      if(!tid) return;
+      totals[tid] = (totals[tid] || 0) + (Number(p.score) || 0);
+    });
+    const rankedTeams = teamConfig.teams
+      .map(t => ({ ...t, score: totals[t.id] || 0 }))
+      .sort((a,b) => b.score - a.score);
+    rankedTeams.forEach((t, i) => {
+      const row = document.createElement('div');
+      row.className = 'glass rounded-[1.6rem] px-4 py-3 flex items-center justify-between font-bold';
+      row.style.border = `3px solid ${t.color}`;
+      row.style.boxShadow = `0 0 0 3px ${t.color}33`;
+      row.innerHTML = `<div class="flex items-center gap-3"><span class="w-6">${i+1}</span><span class="flex items-center gap-1.5 truncate"><span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background:${t.color}"></span>${escapeHtml(t.name)}</span></div><span class="shrink-0">${t.score}점</span>`;
+      list.appendChild(row);
+    });
+  } else {
+    ranked.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'glass rounded-[1.6rem] px-4 py-3 flex items-center justify-between font-bold';
+      row.innerHTML = `<div class="flex items-center gap-3"><span class="w-6">${i+1}</span><span>${p.avatar} ${escapeHtml(p.nickname)}</span></div><span>${p.score}점</span>`;
+      list.appendChild(row);
+    });
+  }
 
   // [수정] 선생님 화면처럼, 학생 본인 화면에도 자기 팀과 점수를 눈에 띄게 보여줍니다.
   // [디자인 개선] "내 팀:", "내 점수:" 같은 라벨 텍스트를 없애고, 순위 뱃지 · 팀 색상점 · 큰 점수
@@ -2212,8 +2301,19 @@ function renderLeaderboardScreen(data){
     }
   }
 
-  if(state.isHost) document.getElementById('host-leaderboard-controls').classList.remove('hidden');
-  else document.getElementById('student-leaderboard-wait').classList.remove('hidden');
+  // [기능 추가] 선생님이 "다음 문제" 버튼을 눌러서 nextQuestionAnnounce 플래그가
+  // 켜져 있는 동안에는, 선생님/학생 화면 모두에 "다음 문제가 곧 시작됩니다!"
+  // 문구만 보여주고 버튼과 "준비 중입니다" 문구는 숨겨서 예고 없이 문제가
+  // 갑자기 시작돼 당황하는 일을 막습니다.
+  const announcing = !!data.nextQuestionAnnounce;
+  document.getElementById('leaderboard-next-announce').classList.toggle('hidden', !announcing);
+  if(announcing){
+    document.getElementById('host-leaderboard-controls').classList.add('hidden');
+    document.getElementById('student-leaderboard-wait').classList.add('hidden');
+  } else {
+    if(state.isHost) document.getElementById('host-leaderboard-controls').classList.remove('hidden');
+    else document.getElementById('student-leaderboard-wait').classList.remove('hidden');
+  }
 }
 
 function renderPodiumScreen(data){
