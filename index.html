@@ -576,7 +576,7 @@
     <!-- [기능 추가] 선생님이 "다음 문제" 버튼을 누르면 학생 화면에도 이 문구가 떠서,
          문제가 예고 없이 갑자기 시작돼 당황하는 것을 막아줍니다. -->
     <p id="leaderboard-next-announce" class="hidden glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg text-center">
-      다음 문제가 곧 시작됩니다! <i class="fa-solid fa-forward ml-1"></i>
+      <span id="leaderboard-next-announce-text">다음 문제가 곧 시작됩니다!</span> <i class="fa-solid fa-forward ml-1"></i>
     </p>
     <div id="host-leaderboard-controls" class="hidden">
       <button id="host-next-question-btn" onclick="hostNextQuestion()" class="glow-btn bg-gradient-to-r from-[var(--pastel-pink)] to-[var(--pastel-purple)] rounded-[1.9rem] px-8 py-3 font-bold text-lg">
@@ -776,7 +776,8 @@ const state = {
   editingQuestionIndex: null, // 문제 목록 내에서 개별 문제를 수정 중일 때의 인덱스
   quizBankCache: {},
   lastMediaKey: null,
-  lastCountdownVal: null
+  lastCountdownVal: null,
+  _podiumSequenceStarted: false // 시상식 3-2-1 연출(드럼롤→1위 공개→팡파레)이 이미 시작됐는지 여부
 };
 
 /* 오디오 효과음 처리 */
@@ -829,6 +830,22 @@ function playWhoosh(){ playTone(300,0.18,'sine',0.08); playTone(150,0.22,'sine',
 function playReveal(){ playTone(440,0.08,'triangle',0.12); playTone(659.25,0.1,'triangle',0.14,0.07); }
 function playFanfare(){ [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=>playTone(f,0.22,'triangle',0.16,i*0.12)); }
 
+// [기능 추가] 시상식에서 1위를 공개하기 직전에 재생하는 "두구두구" 북소리입니다.
+// 처음엔 느리게 치다가 점점 타격 간격이 좁아지고(가속) 소리도 커지면서
+// 발표 직전의 긴장감을 살립니다.
+function playDrumroll(totalDuration=1.3){
+  try{
+    const hits = 16;
+    for(let i=0;i<hits;i++){
+      const progress = i/(hits-1);
+      // 뒤로 갈수록 타격이 촘촘해지도록 이징을 적용합니다.
+      const t = Math.pow(progress, 1.6) * totalDuration;
+      const vol = 0.08 + progress*0.12;
+      playTone(100, 0.05, 'triangle', vol, t);
+    }
+  }catch(e){}
+}
+
 window.playClick = playClick;
 window.playPop = playPop;
 window.playAdd = playAdd;
@@ -841,6 +858,7 @@ window.playSubmit = playSubmit;
 window.playWhoosh = playWhoosh;
 window.playReveal = playReveal;
 window.playFanfare = playFanfare;
+window.playDrumroll = playDrumroll;
 
 /* ===================== 배경음악(BGM) ===================== */
 // 화면을 3그룹으로 나눠 그룹이 바뀔 때만 곡을 전환합니다(같은 그룹 안 화면 이동은 끊기지 않음).
@@ -869,6 +887,10 @@ const BGM_SCREEN_GROUP = {
 let bgmUnlocked = false;  // 브라우저 자동재생 정책 때문에 사용자가 한 번은 화면을 터치/클릭해야 재생이 허용됩니다.
 let bgmMuted = false;
 let bgmCurrentGroup = null;
+// [기능 추가] 시상식 화면에 들어가자마자 시상식 BGM이 바로 나오면 3-2-1 연출(드럼롤 등)과
+// 소리가 겹쳐버립니다. 이 플래그가 true인 동안에는 트랙만 준비해두고 실제 재생은 보류했다가,
+// 1위 공개 + 팡파레가 끝난 뒤 releasePodiumBgm()에서 재생을 시작합니다.
+let podiumBgmHold = false;
 
 function getBgmPlayer(){ return document.getElementById('bgm-player'); }
 
@@ -885,6 +907,7 @@ function updateBgmForScreen(screenId){
     // 자체를 건너뛰어서, "화면을 건드리면 바로 음악이 나오던" 기능이 사라진
     // 것처럼 보였습니다. 이제는 같은 그룹이어도 아직 재생 중이 아니면(paused)
     // 잠금 해제 후 이어서 재생을 시도합니다.
+    if(group === 'podium' && podiumBgmHold) return; // 3-2-1 연출이 끝날 때까지 보류
     if(group !== 'silent' && bgmUnlocked && !bgmMuted && player.paused){
       player.play().catch(()=>{});
     }
@@ -902,7 +925,18 @@ function updateBgmForScreen(screenId){
     player.setAttribute('data-track', src);
     player.volume = 0.35; // 효과음보다 살짝 낮게, 배경에 자연스럽게 깔리도록
   }
+  if(group === 'podium' && podiumBgmHold) return; // 트랙만 준비해두고 재생은 연출이 끝난 뒤로 보류
   if(bgmUnlocked && !bgmMuted){
+    player.play().catch(()=>{});
+  }
+}
+
+// [기능 추가] 시상식 3-2-1 연출(드럼롤 → 1위 공개 → 팡파레)이 끝난 시점에 호출해서
+// 보류해뒀던 시상식 BGM 재생을 시작합니다.
+function releasePodiumBgm(){
+  podiumBgmHold = false;
+  const player = getBgmPlayer();
+  if(player && bgmUnlocked && !bgmMuted){
     player.play().catch(()=>{});
   }
 }
@@ -1625,6 +1659,8 @@ async function exitHostLobby(){
     state.players = {};
     state.roomData = {};
     state._podiumSoundPlayed = false;
+    state._podiumSequenceStarted = false;
+    podiumBgmHold = false;
     goTo('screen-host-home');
     playClick();
   }
@@ -1789,11 +1825,24 @@ function startCountdownAndStartGame() {
   // 표시되는 문제가 있었습니다. 게임을 시작하는 시점에 현재 팀전 설정을
   // 무조건 한 번 더 저장해서, 저장 버튼을 깜빡 안 눌러도 항상 최신 설정이
   // 반영되도록 안전장치를 추가합니다.
+  //
+  // [버그 수정] 이전에는 cfg.enabled가 true일 때만 저장했기 때문에, 저번 게임에서
+  // 팀전을 켰다가 이번 게임에서 껐을 경우 Firebase에는 이전 게임의
+  // teamConfig.enabled:true가 그대로 남아있었습니다. 그 결과 개인전으로 진행해도
+  // 순위표/시상대가 teamMode를 true로 착각해서 팀 점수판이 보이는 버그가 있었습니다.
+  // 이제는 enabled 여부와 상관없이 항상 현재 설정을 저장해서(꺼져 있으면
+  // enabled:false로 확실히 덮어써서) 방 데이터가 항상 최신 상태를 반영하도록 합니다.
   if(window.TeamSystem && typeof window.TeamSystem.getConfig === 'function'){
     const cfg = window.TeamSystem.getConfig();
-    if(cfg && cfg.enabled && Array.isArray(cfg.teams) && cfg.teams.length > 0){
+    if(cfg){
+      const teamsValid = Array.isArray(cfg.teams) && cfg.teams.length > 0;
       update(ref(db, `rooms/${state.pin}`), {
-        teamConfig: { enabled: cfg.enabled, maxTeams: cfg.maxTeams, teams: cfg.teams, assignments: cfg.assignments }
+        teamConfig: {
+          enabled: !!(cfg.enabled && teamsValid),
+          maxTeams: cfg.maxTeams,
+          teams: cfg.teams || [],
+          assignments: cfg.assignments || {}
+        }
       }).catch(err => console.error('팀 설정 자동 저장 실패:', err));
     }
   }
@@ -1920,13 +1969,15 @@ async function hostNextQuestion(){
   }
 
   // 학생 화면에도 예고 문구가 뜨도록 방 데이터에 플래그를 기록합니다.
-  await update(ref(db, `rooms/${state.pin}`), { nextQuestionAnnounce: true });
+  // 마지막 문제 다음이면(=시상식으로 넘어가는 경우) 문구를 다르게 보여줍니다.
+  const nextIdx = state.currentIndex + 1;
+  const isPodiumNext = nextIdx >= state.quiz.questions.length;
+  await update(ref(db, `rooms/${state.pin}`), { nextQuestionAnnounce: true, nextQuestionAnnouncePodium: isPodiumNext });
 
   await new Promise(resolve => setTimeout(resolve, 2000));
 
-  const nextIdx = state.currentIndex + 1;
-  if(nextIdx >= state.quiz.questions.length){
-    await update(ref(db, `rooms/${state.pin}`), { state: 'podium', nextQuestionAnnounce: null });
+  if(isPodiumNext){
+    await update(ref(db, `rooms/${state.pin}`), { state: 'podium', nextQuestionAnnounce: null, nextQuestionAnnouncePodium: null });
   } else {
     state.currentIndex = nextIdx;
     await update(ref(db, `rooms/${state.pin}`), { state: 'question', currentIndex: nextIdx, nextQuestionAnnounce: null });
@@ -2314,6 +2365,10 @@ function renderLeaderboardScreen(data){
   // 갑자기 시작돼 당황하는 일을 막습니다.
   const announcing = !!data.nextQuestionAnnounce;
   document.getElementById('leaderboard-next-announce').classList.toggle('hidden', !announcing);
+  const announceTextEl = document.getElementById('leaderboard-next-announce-text');
+  if(announceTextEl){
+    announceTextEl.textContent = data.nextQuestionAnnouncePodium ? '시상식 준비중' : '다음 문제가 곧 시작됩니다!';
+  }
   if(announcing){
     document.getElementById('host-leaderboard-controls').classList.add('hidden');
     document.getElementById('student-leaderboard-wait').classList.add('hidden');
@@ -2324,11 +2379,16 @@ function renderLeaderboardScreen(data){
 }
 
 function renderPodiumScreen(data){
-  goTo('screen-podium');
-  if(!state._podiumSoundPlayed){
-    state._podiumSoundPlayed = true;
-    playFanfare();
+  // [기능 추가] 시상식 3-2-1 연출(3위→2위→두구두구 북소리→1위 공개→팡파레+효과음+BGM)은
+  // 이 화면에 처음 들어왔을 때 딱 한 번만 재생합니다. 이후 점수 동기화 등으로
+  // 화면이 다시 그려져도 연출을 처음부터 다시 재생하지 않고 최종 상태만 반영합니다.
+  const isFirstEntry = !state._podiumSequenceStarted;
+  if(isFirstEntry){
+    state._podiumSequenceStarted = true;
+    state._podiumSoundPlayed = true; // 기존 플래그와의 호환을 위해 함께 표시해둡니다.
+    podiumBgmHold = true; // 3-2-1 연출이 끝나기 전까지 시상식 BGM 재생을 보류합니다.
   }
+  goTo('screen-podium');
 
   const runnersUpWrap = document.getElementById('podium-runners-up-wrap');
   const runnersUpList = document.getElementById('podium-runners-up-list');
@@ -2341,6 +2401,10 @@ function renderPodiumScreen(data){
 
   const teamConfig = data.teamConfig;
   const teamMode = !!(teamConfig && teamConfig.enabled && Array.isArray(teamConfig.teams) && teamConfig.teams.length > 0);
+
+  // rankVisuals[순위] = { nameHtml, isHtml, barHeight, scoreText } — 막대 높이와 점수는
+  // 3-2-1 연출 중에 순서대로 적용하기 위해 우선 계산만 해둡니다.
+  const rankVisuals = {};
 
   if(teamMode){
     // 팀전: 시상대를 개인 점수 대신 팀 이름 + 팀 점수로 표시합니다.
@@ -2360,16 +2424,14 @@ function renderPodiumScreen(data){
 
     [1, 2, 3].forEach((rank, i) => {
       const t = rankedTeams[i];
-      const nameEl = document.getElementById(`podium-name-${rank}`);
-      const barEl = document.getElementById(`podium-bar-${rank}`);
-      const scoreEl = document.getElementById(`podium-score-${rank}`);
-      nameEl.innerHTML = t
-        ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${t.color};margin-right:4px;vertical-align:middle"></span>${escapeHtml(t.name)}`
-        : '-';
-      // [수정] 바 안에는 등수 숫자, 그 아래 별도 요소에는 점수를 표시합니다.
-      barEl.innerText = rank;
-      barEl.style.height = t ? (i===0?180:i===1?120:80)+'px' : '30px';
-      scoreEl.innerText = t ? `${Number(t.score)||0}점` : '';
+      rankVisuals[rank] = {
+        isHtml: true,
+        nameHtml: t
+          ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${t.color};margin-right:4px;vertical-align:middle"></span>${escapeHtml(t.name)}`
+          : '-',
+        barHeight: t ? (i===0?180:i===1?120:80) : 30,
+        scoreText: t ? `${Number(t.score)||0}점` : ''
+      };
     });
 
     if (rankedTeams.length > 3) {
@@ -2419,13 +2481,12 @@ function renderPodiumScreen(data){
 
     [1, 2, 3].forEach((rank, i) => {
       const p = ranked[i];
-      document.getElementById(`podium-name-${rank}`).innerText = p ? `${p.avatar} ${p.nickname}` : '-';
-      const barEl = document.getElementById(`podium-bar-${rank}`);
-      const scoreEl = document.getElementById(`podium-score-${rank}`);
-      // [수정] 바 안에는 등수 숫자를 그대로 두고, 바로 아래 별도 요소에 점수를 표시합니다.
-      barEl.innerText = rank;
-      barEl.style.height = p ? (i===0?180:i===1?120:80)+'px' : '30px';
-      scoreEl.innerText = p ? `${Number(p.score)||0}점` : '';
+      rankVisuals[rank] = {
+        isHtml: false,
+        nameHtml: p ? `${p.avatar} ${p.nickname}` : '-',
+        barHeight: p ? (i===0?180:i===1?120:80) : 30,
+        scoreText: p ? `${Number(p.score)||0}점` : ''
+      };
     });
 
     if (ranked.length > 3) {
@@ -2460,9 +2521,72 @@ function renderPodiumScreen(data){
     }
   }
 
+  // 이름은 순위 발표 연출과 무관하게 항상 즉시 반영합니다(실시간 동기화 목적).
+  [1, 2, 3].forEach(rank => {
+    const info = rankVisuals[rank];
+    const nameEl = document.getElementById(`podium-name-${rank}`);
+    if(!info || !nameEl) return;
+    if(info.isHtml) nameEl.innerHTML = info.nameHtml; else nameEl.innerText = info.nameHtml;
+  });
+
+  if(isFirstEntry){
+    // 처음 시상식 화면에 들어왔을 때만 3위 → 2위 → (두구두구) → 1위 순서로 차례차례 공개합니다.
+    runPodiumRevealSequence(rankVisuals);
+  } else {
+    // 이미 연출이 끝난 뒤 다시 그려지는 경우(점수 재동기화 등)에는 애니메이션 없이
+    // 막대 높이와 점수만 최종 상태로 바로 반영합니다.
+    [1, 2, 3].forEach(rank => {
+      const info = rankVisuals[rank];
+      const barEl = document.getElementById(`podium-bar-${rank}`);
+      const scoreEl = document.getElementById(`podium-score-${rank}`);
+      if(!info || !barEl) return;
+      barEl.innerText = rank;
+      barEl.style.height = info.barHeight + 'px';
+      scoreEl.innerText = info.scoreText;
+    });
+  }
+}
+
+// [기능 추가] 시상식 순위 공개 연출입니다. 3위 → 2위를 차례로 솟아오르게 한 뒤,
+// 1위를 공개하기 직전에 두구두구 하는 북소리로 긴장감을 살리고 약간의 딜레이를 둡니다.
+// 이후 1위가 솟아오르면 팡파레와 색종이 효과음을 함께 터뜨리고, 그제서야 시상식
+// 배경음악을 재생합니다.
+async function runPodiumRevealSequence(rankVisuals){
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const reveal = (rank) => {
+    const info = rankVisuals[rank];
+    const barEl = document.getElementById(`podium-bar-${rank}`);
+    const scoreEl = document.getElementById(`podium-score-${rank}`);
+    if(!info || !barEl) return;
+    barEl.innerText = rank;
+    barEl.style.height = info.barHeight + 'px';
+    if(scoreEl) scoreEl.innerText = info.scoreText;
+  };
+
+  // 3위 공개
+  playWhoosh();
+  reveal(3);
+  await sleep(900);
+
+  // 2위 공개
+  playWhoosh();
+  reveal(2);
+  await sleep(900);
+
+  // 1위 공개 직전: 두구두구 북소리 + 약간의 딜레이로 긴장감을 살립니다.
+  playDrumroll();
+  await sleep(1500);
+
+  // 1위 공개: 기존처럼 막대가 솟아오르는 연출(CSS transition)을 그대로 사용합니다.
+  reveal(1);
+  await sleep(1600); // 막대가 다 솟아오를 때까지 기다립니다.
+
+  // 팡파레 + 색종이 효과음을 함께 터뜨리고, 그제서야 시상식 BGM을 재생합니다.
+  playFanfare();
   if(typeof confetti === 'function') {
     confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
   }
+  releasePodiumBgm();
 }
 
 function syncTimerDisplay(data){
